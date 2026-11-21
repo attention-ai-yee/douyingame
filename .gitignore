@@ -1,0 +1,12 @@
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+# Cocos Creator 生成的目录（settings/ 和 assets/ 要提交）
+client/library/
+client/temp/
+client/local/
+client/build/
+client/native/
+client/profiles/
+client/node_modules/

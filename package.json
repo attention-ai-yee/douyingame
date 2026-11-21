@@ -1,0 +1,16 @@
+{
+  "name": "yushou-shanhai-tools",
+  "private": true,
+  "description": "《御兽山海》开发工具：core/platform 单元测试与类型检查。游戏工程本身在 client/（用 Cocos Creator 打开）。",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check-config": "vitest run tests/config.test.ts",
+    "sim": "python3 tools/sim/sim.py"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.8"
+  }
+}
