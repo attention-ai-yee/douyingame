@@ -128,7 +128,7 @@ export class Boot extends Component {
 
   private autoStep(): void {
     const core = App.core;
-    core.claimOffline(1);
+    core.claimChest(1);
     if (core.canClaimSignin()) {
       const r = core.idx.cfg.signin.firstRound;
       const today = r[core.state.signin.claimedInRound % r.length];
@@ -142,7 +142,8 @@ export class Boot extends Component {
     if (!this.reveal) while (core.revealQueue.length) core.finishReveal(core.revealQueue[0], App.cfg.reveal.skipSeals);
     for (const id of Object.keys(core.state.beasts)) while (core.starUp(id, true));
     core.autoTeam();
-    core.upgradeCheapest();
+    core.equipBest();
+    core.upgradeTeam();
     while (core.challengeStage().win);
     if (core.towerUnlocked()) while (core.challengeFloor().win);
     App.save();
@@ -153,8 +154,8 @@ function describeReward(r: RevealReward): string {
   const parts = ['收服！'];
   if (r.dianjing) parts.push('点睛成功：变为闪光！');
   if (r.shards > 0) parts.push(`星魄 +${r.shards}`);
-  if (r.gold > 0) parts.push(`金币 +${formatNumber(r.gold)}`);
-  if (r.seals < 2) parts.push('（2 印得金币，3 印得星魄并有机会点睛）');
+  if (r.gold > 0) parts.push(`金币 +${formatNumber(r.gold)}　经验 +${formatNumber(r.exp)}`);
+  if (r.seals < 2) parts.push('（2 印得金币经验，3 印得星魄并有机会点睛）');
   return parts.join('\n');
 }
 

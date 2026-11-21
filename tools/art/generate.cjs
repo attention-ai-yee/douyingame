@@ -68,6 +68,34 @@ const ticket = () => svg(112, 112, `<g transform="rotate(-12 56 56)"><rect x="30
   <path d="M56,24 C42,34 70,40 54,52 C40,62 70,68 56,80" stroke="#ff5a5a" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="56" cy="90" r="6" fill="#ff5a5a"/></g>`);
 const flame = () => svg(112, 112, `<path d="M56,8 C72,30 94,44 88,72 C84,94 68,104 56,104 C42,104 22,94 22,72 C20,52 36,44 40,28 C46,42 50,46 54,48 C56,34 54,20 56,8 Z" fill="#ff6b4a" stroke="${OL}" stroke-width="${SW}" stroke-linejoin="round"/>
   <path d="M56,54 C66,66 72,76 66,88 C62,96 50,96 46,88 C42,78 50,68 56,54 Z" fill="#ffd84d"/>`);
+/** 经验：一颗青绿色灵气珠。 */
+const expOrb = () => svg(112, 112, `<radialGradient id="o" cx="0.38" cy="0.32" r="0.75"><stop offset="0" stop-color="#e9fff4"/><stop offset="0.45" stop-color="#7ff0c0"/><stop offset="1" stop-color="#21b38a"/></radialGradient>
+  <circle cx="56" cy="58" r="42" fill="url(#o)" stroke="${OL}" stroke-width="${SW}"/>
+  <path d="M40,66 C40,46 66,44 66,58 C66,68 52,70 50,62 C48,56 56,54 58,58" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+  <ellipse cx="40" cy="38" rx="9" ry="5" fill="#fff" opacity="0.85" transform="rotate(-35 40 38)"/>`);
+/** 挂机宝箱（full 为攒满时发光）。 */
+const chestBox = (full) => svg(150, 150, `<radialGradient id="glow"><stop offset="0" stop-color="#fff3a8" stop-opacity="0.95"/><stop offset="1" stop-color="#fff3a8" stop-opacity="0"/></radialGradient>
+  ${full ? '<circle cx="75" cy="70" r="72" fill="url(#glow)"/>' : ''}
+  <path d="M22,70 L128,70 L122,128 Q75,136 28,128 Z" fill="#c9773b" stroke="${OL}" stroke-width="${SW}" stroke-linejoin="round"/>
+  <path d="M22,70 Q22,34 75,32 Q128,34 128,70 Z" fill="#e8964f" stroke="${OL}" stroke-width="${SW}" stroke-linejoin="round"/>
+  <path d="M48,34 L48,128 M102,34 L102,128" stroke="#ffd84d" stroke-width="9"/><path d="M48,34 L48,128 M102,34 L102,128" stroke="${OL}" stroke-width="2" opacity="0.4"/>
+  <rect x="20" y="64" width="110" height="14" rx="6" fill="#ffd84d" stroke="${OL}" stroke-width="4"/>
+  <rect x="63" y="62" width="24" height="30" rx="6" fill="#ffe27a" stroke="${OL}" stroke-width="4"/><circle cx="75" cy="76" r="4" fill="${OL}"/>
+  <ellipse cx="44" cy="46" rx="12" ry="5" fill="#fff" opacity="0.5" transform="rotate(-20 44 46)"/>
+  ${full ? '<path d="M118,26 l4,10 10,4 -10,4 -4,10 -4,-10 -10,-4 10,-4z M30,22 l3,7 7,3 -7,3 -3,7 -3,-7 -7,-3 7,-3z" fill="#fff" stroke="#ffb020" stroke-width="2"/>' : ''}`);
+/** 装备部位图标：兽爪、鳞甲、灵铃、护符。 */
+const equipIcon = (k) => {
+  const body = [
+    `<path d="M36,88 C30,62 40,38 52,26 M56,90 C52,64 58,40 70,28 M76,90 C76,68 80,50 90,40" fill="none" stroke="${OL}" stroke-width="14" stroke-linecap="round"/><path d="M36,88 C30,62 40,38 52,26 M56,90 C52,64 58,40 70,28 M76,90 C76,68 80,50 90,40" fill="none" stroke="#f3efe6" stroke-width="7" stroke-linecap="round"/>`,
+    `<path d="M56,18 L90,30 L86,70 Q74,92 56,98 Q38,92 26,70 L22,30 Z" fill="#7cc4ff" stroke="${OL}" stroke-width="${SW}" stroke-linejoin="round"/><path d="M38,44 Q56,54 74,44 M36,62 Q56,72 76,62 M42,80 Q56,88 70,80" fill="none" stroke="${OL}" stroke-width="3.5" opacity="0.7"/>`,
+    `<path d="M56,18 L56,28" stroke="${OL}" stroke-width="6" stroke-linecap="round"/><path d="M30,76 Q30,32 56,28 Q82,32 82,76 Z" fill="#ffd84d" stroke="${OL}" stroke-width="${SW}" stroke-linejoin="round"/><rect x="24" y="72" width="64" height="12" rx="6" fill="#e8a317" stroke="${OL}" stroke-width="4"/><circle cx="56" cy="92" r="8" fill="#ff5a5a" stroke="${OL}" stroke-width="4"/>`,
+    `<rect x="32" y="16" width="48" height="84" rx="8" fill="#ffe27a" stroke="${OL}" stroke-width="${SW}"/><path d="M56,28 C44,38 68,44 54,56 C42,66 68,72 56,84" stroke="#ff5a5a" stroke-width="6" fill="none" stroke-linecap="round"/>`,
+  ][k];
+  return svg(112, 112, body);
+};
+const bag = () => svg(112, 112, `<path d="M40,30 Q56,14 72,30" fill="none" stroke="${OL}" stroke-width="7" stroke-linecap="round"/>
+  <path d="M24,44 Q24,32 36,32 L76,32 Q88,32 88,44 L94,90 Q94,100 84,100 L28,100 Q18,100 18,90 Z" fill="#c9773b" stroke="${OL}" stroke-width="${SW}" stroke-linejoin="round"/>
+  <rect x="44" y="52" width="24" height="18" rx="5" fill="#ffd84d" stroke="${OL}" stroke-width="4"/><ellipse cx="38" cy="46" rx="9" ry="4" fill="#fff" opacity="0.5"/>`);
 /** 圆形彩色图标底 + 白字（右侧悬浮按钮）。 */
 const roundIcon = (bg, ch) => svg(112, 112, `<circle cx="56" cy="62" r="46" fill="${OL}"/><circle cx="56" cy="56" r="46" fill="${bg}" stroke="${OL}" stroke-width="${SW}"/>
   <ellipse cx="36" cy="34" rx="11" ry="6" fill="#fff" opacity="0.5" transform="rotate(-30 36 34)"/>
@@ -98,6 +126,11 @@ for (const r of Object.keys(RARITY)) add(`frame_${r}`, frame(r));
 add('icon_gold', coin());
 add('icon_ticket', ticket());
 add('icon_power', flame());
+add('icon_exp', expOrb());
+add('chest_box', chestBox(false));
+add('chest_box_full', chestBox(true));
+for (let k = 0; k < 4; k++) add(`equip_${k}`, equipIcon(k));
+add('icon_bag', bag());
 add('icon_signin', roundIcon('#ff7b7b', '签'));
 add('icon_task', roundIcon('#7cc4ff', '任'));
 add('icon_chest', roundIcon('#ffc43d', '宝'));

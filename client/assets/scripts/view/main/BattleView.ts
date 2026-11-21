@@ -1,10 +1,10 @@
 import { _decorator, Component, Graphics, Label, Node, UIOpacity, UITransform } from 'cc';
 import { App } from '../../app/App';
-import { formatNumber } from '../../core';
+import { ChallengeResult, formatNumber } from '../../core';
 import { BeastIcon, makeBeastIcon } from '../ui/BeastIcon';
 import { makeSprite, setSprite, Skin } from '../ui/Skin';
 import { hex, makeLabel, setLabel, uiNode } from '../ui/UiKit';
-import { floatText, skinButton, SkinButton } from '../ui/Widgets';
+import { floatText } from '../ui/Widgets';
 import { BattleSim, HitEvent } from './BattleSim';
 
 const { ccclass } = _decorator;
@@ -33,28 +33,36 @@ interface UnitView {
   scale: number;
 }
 
+export type BattleMode =
+  /** 首页挂机：一波接一波打小怪，永远是赢，打倒的小怪掉落飞进宝箱。不推关。 */
+  | { kind: 'idle' }
+  /** 进山闯关：打指定的下一关（或镇妖塔下一层）一场，打完由 core 判定胜负。 */
+  | { kind: 'stage' }
+  | { kind: 'tower' };
+
 export interface BattleHost {
-  /** 推进成功（首通），用来刷新顶栏、提示奖励。 */
-  onCleared(stage: number, gold: number, tickets: number): void;
-  toast(text: string): void;
+  /** 挂机时打倒一只小怪（x、y 为战斗区域内坐标），用来播放掉落飞进宝箱。 */
+  onLoot?(x: number, y: number): void;
+  /** 闯关打完一场。 */
+  onResult?(res: ChallengeResult): void;
 }
 
 /**
- * 主界面上半屏的自动战斗演出。
- * - 推图模式：打下一关，赢了自动继续；遇到 Boss 关停下来，等玩家点"挑战 Boss"。
- * - 挂机模式：重复打已通关的关卡（只是演出，金币按时间在 core 里结算）；战力够了自动回到推图。
- * - 输了弹出失败面板：召唤助战（看视频）、去升级、继续挂机。
+ * 横版自动战斗演出（结果由 core 按战力判定，这里只负责表现）。
+ * - idle：首页挂机，小怪按当前地图生成，强度远低于我方，永远打得过；
+ * - stage / tower：进山里点"挑战"后打一场，结束时调用 core.challengeStage / challengeFloor。
  */
 @ccclass('BattleView')
 export class BattleView extends Component {
-  static create(parent: Node, w: number, h: number, x: number, y: number, host: BattleHost): BattleView {
+  static create(parent: Node, w: number, h: number, x: number, y: number, mode: BattleMode, host: BattleHost): BattleView {
     const n = uiNode('Battle', parent, x, y);
     const v = n.addComponent(BattleView);
-    v.setup(w, h, host);
+    v.setup(w, h, mode, host);
     return v;
   }
 
   private host!: BattleHost;
+  private mode: BattleMode = { kind: 'idle' };
   private w = 750;
   private h = 580;
   private bg!: Node;
@@ -64,29 +72,37 @@ export class BattleView extends Component {
   private allies: UnitView[] = [];
   private enemies: UnitView[] = [];
   private sim: BattleSim | null = null;
-  private mode: 'push' | 'farm' = 'push';
-  private fightIsPush = false;
-  private fightAssist = false;
-  private bossRequested = false;
-  private cooldown = 0.6;
-  private bossBtn!: SkinButton;
-  private failPanel: Node | null = null;
+  private assist = false;
+  private cooldown = 0.5;
+  private finished = false;
+  private wave = 0;
   private banner!: Label;
 
-  private setup(w: number, h: number, host: BattleHost): void {
+  private setup(w: number, h: number, mode: BattleMode, host: BattleHost): void {
     this.host = host;
+    this.mode = mode;
     this.w = w;
     this.h = h;
     this.bg = uiNode('Bg', this.node);
     this.unitsRoot = uiNode('Units', this.node);
     this.fxRoot = uiNode('Fx', this.node);
     const bannerBg = makeSprite(this.node, 'pill', 300, 52, -w / 2 + 170, h / 2 - 50, { fallback: '#fffaf0', alpha: 230 });
-    this.banner = makeLabel(bannerBg, '', 26, '#4a2f27', 0, 0);
-    this.bossBtn = skinButton(this.node, 'btn_red', '挑战 Boss', 300, 92, () => this.requestBoss(), 0, -h / 2 + 58);
-    this.bossBtn.node.active = false;
-    // 战斗区域本身吃掉点击，避免误触到下面
+    this.banner = makeLabel(bannerBg, '', 24, '#4a2f27', 0, 0);
     const ut = this.node.getComponent(UITransform) || this.node.addComponent(UITransform);
     ut.setContentSize(w, h);
+  }
+
+  /** 闯关模式：开打（useAssist 为 true 表示已看完助战广告）。 */
+  startChallenge(useAssist = false): void {
+    this.assist = useAssist;
+    this.finished = false;
+    this.cooldown = 0;
+    this.sim = null;
+    this.startFight();
+  }
+
+  get fighting(): boolean {
+    return !!this.sim;
   }
 
   // ------------------------------------------------------------ 每帧
@@ -94,10 +110,11 @@ export class BattleView extends Component {
   update(dt: number): void {
     if (!App.ready) return;
     this.refreshBackground();
-    if (this.failPanel) return;
     if (!this.sim) {
-      this.cooldown -= dt;
-      if (this.cooldown <= 0) this.startFight();
+      if (this.mode.kind === 'idle') {
+        this.cooldown -= dt;
+        if (this.cooldown <= 0) this.startFight();
+      }
       this.animateUnits(dt);
       return;
     }
@@ -110,129 +127,85 @@ export class BattleView extends Component {
 
   // ------------------------------------------------------------ 开打 / 结算
 
-  private startFight(useAssist = false): void {
+  /** 当前所在地图（挂机用的是已通关的最远地图）。 */
+  private chapterNow(): number {
     const core = App.core;
-    const next = core.nextStage();
-    if (this.mode === 'push' && next && (next.isSmallBoss || next.isChapterBoss) && !this.bossRequested) this.mode = 'farm';
-    const push = this.mode === 'push' && !!next;
-    const stage = push && next ? next.stage : Math.max(1, core.state.stage);
-    const enemyPower = core.f.enemyPower(stage);
-    const mult = useAssist ? App.cfg.progression.assist.powerMult : 1;
-    const power = core.teamPower() * mult;
-    const win = push ? power >= enemyPower : true;
-    this.fightIsPush = push;
-    this.fightAssist = useAssist;
+    const n = this.mode.kind === 'stage' ? core.state.stage + 1 : Math.max(1, core.state.stage);
+    return Math.min(core.f.chapterOfStage(n), App.cfg.stages.chapters.length);
+  }
 
+  private startFight(): void {
+    const core = App.core;
     const team = this.teamIds();
-    const totalUnitPower = team.reduce((a, id) => a + core.f.unitPower(id, core.state.beasts[id].star, core.state.beasts[id].awaken, core.state.beasts[id].shiny), 0) || 1;
-    const allyPowers = team.map((id) => {
-      const b = core.state.beasts[id];
-      return (power * core.f.unitPower(id, b.star, b.awaken, b.shiny)) / totalUnitPower;
-    });
-    const isChapterBoss = core.f.isChapterBoss(stage);
-    const isSmallBoss = core.f.isSmallBoss(stage);
-    const enemyIds = this.enemyIds(stage, isChapterBoss, isSmallBoss);
+    const myPower = core.teamPower() * (this.assist ? App.cfg.progression.assist.powerMult : 1);
+    let enemyPower: number;
+    let enemyIds: string[];
+    let boss = false;
+    let win = true;
+    let title: string;
+    if (this.mode.kind === 'idle') {
+      this.wave++;
+      const stage = Math.max(1, core.state.stage);
+      enemyIds = this.mobIds(stage, this.wave);
+      enemyPower = Math.max(1, myPower * 0.35);
+      const ch = App.cfg.stages.chapters[this.chapterNow() - 1];
+      title = `${ch.name.split('·')[0]} · 挂机中`;
+    } else if (this.mode.kind === 'stage') {
+      const next = core.nextStage();
+      if (!next) return;
+      enemyPower = next.enemyPower;
+      boss = next.isSmallBoss || next.isChapterBoss;
+      enemyIds = this.stageEnemyIds(next.stage, next.isChapterBoss, next.isSmallBoss);
+      win = myPower >= enemyPower;
+      const ch = App.cfg.stages.chapters[next.chapter - 1];
+      title = `${ch.name.split('·')[0]} · 第 ${next.stage - (next.chapter - 1) * App.cfg.stages.chapterLength} 关`;
+    } else {
+      const f = core.state.floor + 1;
+      enemyPower = core.nextFloorPower();
+      boss = core.f.isTowerBoss(f);
+      enemyIds = this.stageEnemyIds(40 + f, false, boss);
+      win = myPower >= enemyPower;
+      title = `镇妖塔 · 第 ${f} 层`;
+    }
+    const unitPowers = team.map((id) => core.unitPower(id));
+    const total = unitPowers.reduce((a, b) => a + b, 0) || 1;
+    const allyPowers = unitPowers.map((p) => (myPower * p) / total);
     // 演出用的随机数不消耗 core 的随机序列
     this.sim = new BattleSim({ allyPowers, enemyCount: enemyIds.length, enemyPower, win, rng: Math.random });
-    this.buildUnits(team, enemyIds, isChapterBoss || isSmallBoss);
-    const ch = App.cfg.stages.chapters[core.f.chapterOfStage(stage) - 1];
-    const title = isChapterBoss ? `第 ${stage} 关 · ${ch.boss.name}` : isSmallBoss ? `第 ${stage} 关 · 小 Boss` : `第 ${stage} 关`;
-    setLabel(this.banner, push ? title : `${title}（挂机中）`);
-    App.analytics.track('stage_start', { stage, push, power: Math.round(power), enemyPower: Math.round(enemyPower), assist: useAssist });
+    this.buildUnits(team, enemyIds, boss);
+    setLabel(this.banner, title);
   }
 
   private finishFight(): void {
-    const sim = this.sim as BattleSim;
     this.sim = null;
-    this.cooldown = 0.7;
+    this.cooldown = 0.6;
+    if (this.mode.kind === 'idle' || this.finished) return;
+    this.finished = true;
     const core = App.core;
-    if (!this.fightIsPush) {
-      // 挂机打完一场：如果下一关不是 Boss 且战力够了，自动回到推图
-      const next = core.nextStage();
-      if (next && !next.isSmallBoss && !next.isChapterBoss && core.teamPower() >= next.enemyPower) this.mode = 'push';
-      this.bossBtn.node.active = !!next && (next.isSmallBoss || next.isChapterBoss) && this.mode === 'farm';
-      return;
-    }
-    const before = core.state.stage;
-    const res = core.challengeStage(this.fightAssist);
-    if (res.win) {
-      this.bossRequested = false;
-      this.mode = 'push';
-      this.bossBtn.node.active = false;
-      const gold = App.core.f.goldPerMin(core.state.stage) * App.cfg.progression.gold.firstClearMinutes;
-      floatText(this.fxRoot, `通关！+${formatNumber(gold)} 金币`, 0, 40, 36, '#b3261e', 1.2, 50);
-      this.host.onCleared(core.state.stage, gold, 0);
-      App.analytics.track('stage_win', { stage: core.state.stage, power: Math.round(res.power), enemyPower: Math.round(res.enemyPower) });
-      App.save();
-    } else {
-      App.analytics.track('stage_fail', { stage: before + 1, power: Math.round(res.power), enemyPower: Math.round(res.enemyPower), simWin: sim.win });
-      this.mode = 'farm';
-      this.bossRequested = false;
-      this.showFail(res.power, res.enemyPower);
-    }
-  }
-
-  private requestBoss(): void {
-    this.bossRequested = true;
-    this.mode = 'push';
-    this.bossBtn.node.active = false;
-    this.sim = null;
-    this.cooldown = 0.2;
-  }
-
-  // ------------------------------------------------------------ 失败面板
-
-  private showFail(power: number, enemy: number): void {
-    const p = makeSprite(this.node, 'panel_ink', 600, 330, 0, -20, { fallback: '#17191e', alpha: 240 });
-    this.failPanel = p;
-    makeLabel(p, '挑战失败', 44, '#ff8a65', 0, 112);
-    makeLabel(p, `我方战力 ${formatNumber(power)}　敌方 ${formatNumber(enemy)}`, 26, '#f3e6c8', 0, 56);
-    const ads = App.ads;
-    const left = ads.remaining('assist');
-    const canAssist = ads.available('assist');
-    const b1 = skinButton(p, 'btn_gold', '召唤助战', 250, 96, () => this.onAssist(), -140, -30, `看视频 · 战力×${App.cfg.progression.assist.powerMult}`);
-    b1.setEnabled(canAssist);
-    if (canAssist) ads.markOffered('assist');
-    skinButton(p, 'btn_ink', '去升级', 250, 96, () => this.closeFail('去下方点「一键升级」变强吧'), 140, -30);
-    skinButton(p, 'btn_ink', '先挂机攒一会', 520, 72, () => this.closeFail(''), 0, -128);
-    makeLabel(p, left === null ? '' : `今日助战剩余 ${left} 次`, 20, '#9aa3b2', -140, -88);
-  }
-
-  private closeFail(msg: string): void {
-    if (this.failPanel) this.failPanel.destroy();
-    this.failPanel = null;
-    if (msg) this.host.toast(msg);
-  }
-
-  private async onAssist(): Promise<void> {
-    const r = await App.ads.showRewarded('assist');
-    if (!r.granted) {
-      this.host.toast(r.status === 'skipped' ? '没有看完视频，不能召唤助战' : '暂时没有广告，稍后再试');
-      return;
-    }
-    this.closeFail('');
-    this.bossRequested = true;
-    this.mode = 'push';
-    this.sim = null;
-    this.startFight(true);
+    const res = this.mode.kind === 'stage' ? core.challengeStage(this.assist) : core.challengeFloor(this.assist);
+    if (this.host.onResult) this.host.onResult(res);
   }
 
   // ------------------------------------------------------------ 单位
 
   private teamIds(): string[] {
-    const core = App.core;
-    const k = core.slotsAvailable();
-    const out: string[] = [];
-    for (let i = 0; i < k; i++) {
-      const id = core.state.team[i];
-      if (id && core.state.beasts[id]) out.push(id);
-    }
-    return out.length ? out : Object.keys(core.state.beasts).slice(0, 1);
+    const ids = App.core.teamIds();
+    return ids.length ? ids : Object.keys(App.core.state.beasts).slice(0, 1);
   }
 
-  /** 敌人：用当前章节山里的凡/灵兽换色当小怪；Boss 关用对应的稀有兽或章节 Boss。 */
-  private enemyIds(stage: number, chapterBoss: boolean, smallBoss: boolean): string[] {
-    const ch = App.core.f.chapterOfStage(stage);
+  /** 挂机小怪：当前地图的凡/灵兽，每波 2～3 只。 */
+  private mobIds(stage: number, wave: number): string[] {
+    const m = App.core.idx.mountainOfChapter[this.chapterNow()];
+    const pool = m.tiers.fan.map((x) => x[0]).concat(m.tiers.ling.map((x) => x[0]));
+    const count = 2 + (wave % 2);
+    const out: string[] = [];
+    for (let i = 0; i < count; i++) out.push(pool[(stage + wave * 5 + i * 3) % pool.length]);
+    return out;
+  }
+
+  /** 关卡敌人：小怪用当前章节山里的凡/灵兽；Boss 关用对应的稀有兽或章节 Boss。 */
+  private stageEnemyIds(stage: number, chapterBoss: boolean, smallBoss: boolean): string[] {
+    const ch = Math.min(App.core.f.chapterOfStage(stage), App.cfg.stages.chapters.length);
     const m = App.core.idx.mountainOfChapter[ch];
     const fan = m.tiers.fan.map((x) => x[0]);
     const ling = m.tiers.ling.map((x) => x[0]);
@@ -261,7 +234,6 @@ export class BattleView extends Component {
   private makeUnit(beastId: string, x: number, y: number, dir: number, enemy: boolean, scale: number): UnitView {
     const root = uiNode('Unit', this.unitsRoot, x, y);
     root.setScale(scale, scale, 1);
-    // 立绘统一朝右；敌人镜像朝左
     const icon = makeBeastIcon(root, beastId, UNIT * 1.25, 0, 6, { frame: null, enemy });
     // 我方朝右、敌人朝左；立绘本身朝左的要反过来
     const artLeft = App.core.idx.beast[beastId].facing === 'left';
@@ -270,6 +242,10 @@ export class BattleView extends Component {
     const hpFill = makeSprite(root, enemy ? 'hp_red' : 'hp_green', HP_W - 8, 12, -(HP_W - 8) / 2, -UNIT / 2 - 20, { fallback: enemy ? '#ff5a5a' : '#3fcf7f' });
     const ut = hpFill.getComponent(UITransform);
     if (ut) ut.setAnchorPoint(0, 0.5);
+    if (!enemy && this.mode.kind !== 'idle') {
+      const b = App.core.state.beasts[beastId];
+      if (b) makeLabel(root, `Lv.${b.level}`, 20, '#ffffff', 0, UNIT / 2 + 14);
+    }
     return { root, icon, hpFill, baseX: x, baseY: y, dir, lunge: 0, flash: 0, dead: false, scale };
   }
 
@@ -283,6 +259,7 @@ export class BattleView extends Component {
     if (e.side === 'ally') {
       const txt = e.crit ? `暴击 ${formatNumber(e.dmg)}` : formatNumber(e.dmg);
       floatText(this.fxRoot, txt, p.x + (Math.random() * 30 - 15), p.y + 50, e.crit ? 34 : 28, e.crit ? '#ff6d00' : '#fff4d6', 0.7, 55);
+      if (e.killed && this.mode.kind === 'idle' && this.host.onLoot) this.host.onLoot(p.x, p.y);
     } else {
       floatText(this.fxRoot, `-${formatNumber(e.dmg)}`, p.x, p.y + 40, 22, '#e53935', 0.6, 40);
     }
@@ -312,33 +289,28 @@ export class BattleView extends Component {
       u.icon.tint(u.flash > 0 ? '#ff8a80' : 'normal');
       if (u.dead) {
         const op = u.root.getComponent(UIOpacity) || u.root.addComponent(UIOpacity);
-        op.opacity = Math.max(60, op.opacity - Math.round(dt * 600));
+        op.opacity = Math.max(this.mode.kind === 'idle' ? 0 : 60, op.opacity - Math.round(dt * 600));
       }
     }
   }
 
   private refreshBackground(): void {
-    const ch = App.core.f.chapterOfStage(App.core.state.stage + 1);
-    const m = App.core.idx.mountainOfChapter[Math.min(ch, App.cfg.stages.chapters.length)];
-    const name = `bg_battle_${m ? m.id : 'nanshan'}`;
-    if (name !== this.bgName) {
-      this.bgName = name;
-      if (Skin.has(name)) {
-        setSprite(this.bg, name, this.w, this.h);
-      } else {
-        // 背景图还没到：蓝天 + 草地占位
-        const g = this.bg.getComponent(Graphics) || this.bg.addComponent(Graphics);
-        g.clear();
-        g.fillColor = hex('#bfe6ff');
-        g.rect(-this.w / 2, -this.h / 2, this.w, this.h);
-        g.fill();
-        g.fillColor = hex('#c9eba0');
-        g.rect(-this.w / 2, -this.h / 2, this.w, this.h * 0.42);
-        g.fill();
-        g.fillColor = hex('#4a2f27');
-        g.rect(-this.w / 2, -this.h / 2 + this.h * 0.42 - 2, this.w, 4);
-        g.fill();
-      }
+    const m = App.core.idx.mountainOfChapter[this.chapterNow()];
+    const name = this.mode.kind === 'tower' ? 'bg_battle_beidongzhong' : `bg_battle_${m ? m.id : 'nanshan'}`;
+    if (name === this.bgName) return;
+    this.bgName = name;
+    if (Skin.has(name)) {
+      setSprite(this.bg, name, this.w, this.h);
+      return;
     }
+    // 背景图还没到：蓝天 + 草地占位
+    const g = this.bg.getComponent(Graphics) || this.bg.addComponent(Graphics);
+    g.clear();
+    g.fillColor = hex('#bfe6ff');
+    g.rect(-this.w / 2, -this.h / 2, this.w, this.h);
+    g.fill();
+    g.fillColor = hex('#c9eba0');
+    g.rect(-this.w / 2, -this.h / 2, this.w, this.h * 0.42);
+    g.fill();
   }
 }

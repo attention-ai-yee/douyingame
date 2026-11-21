@@ -8,6 +8,7 @@ export type EventName =
   | 'session_start'
   | 'session_end'
   | 'tutorial_step'
+  | 'stage_open'
   | 'stage_start'
   | 'stage_win'
   | 'stage_fail'
@@ -20,12 +21,13 @@ export type EventName =
   | 'star_up'
   | 'melt'
   | 'awaken'
-  | 'slot_level_up'
+  | 'beast_level_up'
+  | 'team_level_up'
   | 'ad_offer_show'
   | 'ad_click'
   | 'ad_complete'
   | 'ad_fail'
-  | 'offline_claim';
+  | 'chest_claim';
 
 export class Analytics {
   /** 最近的事件，调试面板可以显示。 */

@@ -7,7 +7,7 @@
   },
   "players": {
     "ad": {
-      "label": "看广告型：每次都看离线翻倍，每天 3 次看视频得进山符，卡 Boss 会用助战",
+      "label": "看广告型：每次回来领宝箱都看视频翻倍，每天 3 次看视频得寻兽符，卡 Boss 会用助战",
       "watchAds": true,
       "day1AdTicketViews": 2,
       "adTicketViews": 3
