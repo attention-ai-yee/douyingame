@@ -14,6 +14,8 @@ class MemPlatform implements Platform {
   hide: (() => void)[] = [];
   constructor(public clock: FakeClock) {}
   now = () => this.clock.now();
+  perfNow = () => this.clock.now();
+  lastTouchStartAt = () => null;
   randomSeed = () => 123;
   storageGet = (k: string) => (k in this.store ? this.store[k] : null);
   storageSet = (k: string, v: string) => void (this.store[k] = v);

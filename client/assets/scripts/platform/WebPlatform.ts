@@ -7,9 +7,31 @@ import { EventData, LaunchInfo, Platform, RewardedStatus, SystemInfo } from './P
 export class WebPlatform implements Platform {
   readonly name = 'web' as const;
   private mem: Record<string, string> = {};
+  private lastTouch: number | null = null;
+
+  constructor() {
+    try {
+      // 事件的 timeStamp 和 performance.now() 是同一个时钟
+      const rec = (e: Event) => {
+        this.lastTouch = typeof e.timeStamp === 'number' && e.timeStamp > 0 ? e.timeStamp : this.perfNow();
+      };
+      window.addEventListener('pointerdown', rec, { capture: true, passive: true });
+      window.addEventListener('touchstart', rec, { capture: true, passive: true });
+    } catch (e) {
+      /* 非浏览器环境 */
+    }
+  }
 
   now(): number {
     return Date.now();
+  }
+
+  perfNow(): number {
+    return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+  }
+
+  lastTouchStartAt(): number | null {
+    return this.lastTouch;
   }
 
   randomSeed(): number {

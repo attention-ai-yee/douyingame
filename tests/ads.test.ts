@@ -10,6 +10,8 @@ class FakePlatform implements Platform {
   interstitials = 0;
   constructor(private clock: FakeClock) {}
   now = () => this.clock.now();
+  perfNow = () => this.clock.now();
+  lastTouchStartAt = () => null;
   randomSeed = () => 1;
   storageGet = (k: string) => (k in this.store ? this.store[k] : null);
   storageSet = (k: string, v: string) => void (this.store[k] = v);

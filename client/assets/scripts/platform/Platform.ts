@@ -23,7 +23,15 @@ export type EventData = Record<string, string | number | boolean>;
 
 export interface Platform {
   readonly name: 'douyin' | 'web';
+  /** 墙上时间（毫秒，Date.now），用于存档、离线收益、跨天。 */
   now(): number;
+  /** 高精度单调时钟（毫秒），用于拍符这类需要精确计时的玩法。 */
+  perfNow(): number;
+  /**
+   * 最近一次原生触摸按下的时间（和 perfNow 同一时钟），没有则为 null。
+   * 引擎的触摸事件要等到下一帧才分发，会晚 16～33ms；拍符用这个时间判定更准。
+   */
+  lastTouchStartAt(): number | null;
   randomSeed(): number;
   storageGet(key: string): string | null;
   storageSet(key: string, value: string): void;

@@ -8,6 +8,8 @@ import { EventData, LaunchInfo, Platform, RewardedStatus, SystemInfo } from './P
  * - 插屏：tt.createInterstitialAd，这里每次展示新建实例、关闭后销毁，避免实例状态问题。
  * - 无填充错误码按 1004 处理（需核实抖音的错误码表）。
  * - tt.reportAnalytics 在小游戏里是否可用、是否需要先在后台配置事件，需核实；不可用时静默忽略。
+ * - tt.onTouchStart：按微信小游戏的惯例，多次调用是追加监听、不会顶掉引擎自己的监听（需核实）。
+ *   回调里的 timeStamp 如果和 perfNow 不是同一个时钟，就退回用回调发生时的 perfNow。
  */
 
 interface TTAdError {
@@ -44,6 +46,8 @@ interface TTApi {
   reportAnalytics?(name: string, data: object): void;
   getLaunchOptionsSync?(): { scene?: string | number; query?: Record<string, string> };
   getSystemInfoSync(): { platform?: string; appName?: string; screenWidth?: number; screenHeight?: number };
+  getPerformance?(): { now(): number };
+  onTouchStart?(cb: (res: { timeStamp?: number }) => void): void;
 }
 
 declare const tt: TTApi;
@@ -53,9 +57,39 @@ const NO_FILL_CODES = [1004];
 export class TTPlatform implements Platform {
   readonly name = 'douyin' as const;
   private rewarded: Record<string, TTRewardedVideoAd> = {};
+  private perf: { now(): number } | null = null;
+  private lastTouch: number | null = null;
+
+  constructor() {
+    try {
+      this.perf = tt.getPerformance ? tt.getPerformance() : null;
+    } catch (e) {
+      this.perf = null;
+    }
+    try {
+      if (tt.onTouchStart) {
+        tt.onTouchStart((res) => {
+          const now = this.perfNow();
+          const ts = res && typeof res.timeStamp === 'number' ? res.timeStamp : NaN;
+          // 时间戳和 perfNow 相差很大说明不是同一个时钟，退回用当前时间
+          this.lastTouch = isFinite(ts) && Math.abs(now - ts) < 500 ? ts : now;
+        });
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }
 
   now(): number {
     return Date.now();
+  }
+
+  perfNow(): number {
+    return this.perf ? this.perf.now() : Date.now();
+  }
+
+  lastTouchStartAt(): number | null {
+    return this.lastTouch;
   }
 
   randomSeed(): number {

@@ -16,6 +16,7 @@
     "client/assets/scripts/core/**/*.ts",
     "client/assets/scripts/platform/**/*.ts",
     "client/assets/scripts/app/**/*.ts",
+    "client/assets/scripts/view/reveal/RevealGeometry.ts",
     "tests/**/*.ts"
   ]
 }
