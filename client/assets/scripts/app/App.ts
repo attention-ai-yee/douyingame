@@ -1,5 +1,5 @@
 import { assembleConfig, GameConfig, GameCore, validateConfig } from '../core';
-import { AdService, Analytics, createPlatform, Platform } from '../platform';
+import { ADS_STORAGE_KEY, AdService, Analytics, createPlatform, Platform } from '../platform';
 
 /** 当前发布阶段，决定哪些广告位和功能开放（见 ads.json 的 since）。 */
 export const RELEASE = 'mvp0';
@@ -21,9 +21,23 @@ export class App {
   static configErrors: string[] = [];
   private static sinceSave = 0;
   private static sessionStartAt = 0;
+  private static boundPlatform: Platform | null = null;
+  /** 清档重开期间为 true，防止切后台/销毁时把旧进度又存回去。 */
+  private static saveBlocked = false;
 
-  static boot(configFiles: Record<string, unknown>, platform: Platform = createPlatform()): void {
+  /**
+   * 启动。opts.resetSave 为 true 时先清掉存档（Boot 组件勾选 Reset Save On Start）；
+   * 浏览器预览时网址带 ?reset=1 也会清档。
+   */
+  static boot(configFiles: Record<string, unknown>, platform: Platform = createPlatform(), opts: { resetSave?: boolean } = {}): void {
+    App.ready = false;
+    App.saveBlocked = false;
     App.platform = platform;
+    const urlReset = platform.name === 'web' && platform.launchInfo().query.reset === '1';
+    if (opts.resetSave || urlReset) {
+      App.clearSave();
+      console.log('[App] 已清除存档，从头开始');
+    }
     App.cfg = assembleConfig(configFiles);
     App.configErrors = validateConfig(App.cfg);
     if (App.configErrors.length) console.error('[配置校验失败]\n' + App.configErrors.join('\n'));
@@ -40,15 +54,21 @@ export class App {
 
     App.core.resume();
     App.startSession();
-    platform.onShow(() => {
-      App.core.resume();
-      App.startSession();
-    });
-    platform.onHide(() => {
-      App.core.pause();
-      App.save();
-      App.analytics.track('session_end', { seconds: Math.round((platform.now() - App.sessionStartAt) / 1000) });
-    });
+    if (App.boundPlatform !== platform) {
+      // 每个平台对象只注册一次；回调里用的是 App 的静态字段，清档重开后自动指向新的 core
+      App.boundPlatform = platform;
+      platform.onShow(() => {
+        if (!App.ready) return;
+        App.core.resume();
+        App.startSession();
+      });
+      platform.onHide(() => {
+        if (!App.ready) return;
+        App.core.pause();
+        App.save();
+        App.analytics.track('session_end', { seconds: Math.round((App.platform.now() - App.sessionStartAt) / 1000) });
+      });
+    }
     App.ready = true;
   }
 
@@ -62,14 +82,23 @@ export class App {
 
   /** 关键操作（抽兽、升星、领奖）后也调用一次。 */
   static save(): void {
-    if (!App.ready) return;
+    if (!App.ready || App.saveBlocked) return;
     App.sinceSave = 0;
     App.platform.storageSet(SAVE_KEY, App.core.serialize());
   }
 
-  /** 开发用：清档重开。 */
-  static resetSave(): void {
+  /** 删除存档和广告计数。 */
+  static clearSave(): void {
     App.platform.storageRemove(SAVE_KEY);
+    App.platform.storageRemove(ADS_STORAGE_KEY);
+  }
+
+  /** 开发用：清档并重启游戏。restart 由 view 层提供（浏览器里刷新页面，抖音里 game.restart()）。 */
+  static resetAndRestart(restart: () => void): void {
+    App.saveBlocked = true;
+    App.clearSave();
+    App.ready = false;
+    restart();
   }
 
   private static startSession(): void {

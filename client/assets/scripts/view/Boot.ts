@@ -1,4 +1,4 @@
-import { _decorator, Canvas, Color, Component, Graphics, JsonAsset, Label, Layers, Node, resources } from 'cc';
+import { _decorator, Canvas, Color, Component, game, Graphics, JsonAsset, Label, Layers, Node, resources, UITransform } from 'cc';
 import { App } from '../app/App';
 import { formatNumber } from '../core';
 
@@ -23,7 +23,13 @@ export class Boot extends Component {
   @property
   autoPlay = false;
 
+  /** 勾选后每次启动都清档，从零开始（反复测新手流程用，测完记得取消）。 */
+  @property
+  resetSaveOnStart = false;
+
   private autoTimer = 0;
+  private resetArmed = false;
+  private resetLabel: Label | null = null;
 
   start(): void {
     console.log('[Boot] 开始启动');
@@ -38,7 +44,7 @@ export class Boot extends Component {
       const files: Record<string, unknown> = {};
       for (const a of assets) files[a.name] = a.json;
       console.log(`[Boot] 已加载配置表：${Object.keys(files).join(', ')}`);
-      App.boot(files);
+      App.boot(files, undefined, { resetSave: this.resetSaveOnStart });
       console.log(`[Boot] 启动完成：平台 ${App.platform.name}，关卡 ${App.core.state.stage}，配置错误 ${App.configErrors.length} 条`);
     });
   }
@@ -122,6 +128,50 @@ export class Boot extends Component {
     label.color = new Color(255, 255, 255, 255);
     label.horizontalAlign = Label.HorizontalAlign.LEFT;
     label.string = '加载中…';
+    this.createResetButton(panel);
     return label;
+  }
+
+  /** 调试面板下方的"清档重开"按钮：点两次确认，防止误触。 */
+  private createResetButton(parent: Node): void {
+    const btn = new Node('ResetButton');
+    btn.layer = Layers.Enum.UI_2D;
+    parent.addChild(btn);
+    btn.setPosition(0, -215);
+    const bg = btn.addComponent(Graphics);
+    bg.fillColor = new Color(180, 50, 50, 220);
+    bg.roundRect(-130, -32, 260, 64, 14);
+    bg.fill();
+    const ut = btn.getComponent(UITransform) || btn.addComponent(UITransform);
+    ut.setContentSize(260, 64);
+
+    const txt = new Node('ResetLabel');
+    txt.layer = Layers.Enum.UI_2D;
+    btn.addChild(txt);
+    const label = txt.addComponent(Label);
+    label.fontSize = 26;
+    label.lineHeight = 34;
+    label.color = new Color(255, 255, 255, 255);
+    label.string = '清档重开';
+    this.resetLabel = label;
+
+    btn.on(Node.EventType.TOUCH_END, () => this.onResetTap(), this);
+  }
+
+  private onResetTap(): void {
+    if (!this.resetArmed) {
+      this.resetArmed = true;
+      if (this.resetLabel) this.resetLabel.string = '再点一次确认清档';
+      this.scheduleOnce(() => {
+        this.resetArmed = false;
+        if (this.resetLabel) this.resetLabel.string = '清档重开';
+      }, 3);
+      return;
+    }
+    console.log('[Boot] 清档重开');
+    App.resetAndRestart(() => {
+      if (App.platform.name === 'web' && typeof location !== 'undefined') location.reload();
+      else game.restart();
+    });
   }
 }

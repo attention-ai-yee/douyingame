@@ -28,7 +28,7 @@ interface AdState {
   lastInterstitialAt: number;
 }
 
-const STORAGE_KEY = 'ysh_ads_v1';
+export const ADS_STORAGE_KEY = 'ysh_ads_v1';
 
 export class AdService {
   private state: AdState;
@@ -143,7 +143,7 @@ export class AdService {
 
   private load(): AdState {
     const empty: AdState = { dayKey: '', counts: {}, interstitialCount: 0, lastInterstitialAt: 0 };
-    const raw = this.platform.storageGet(STORAGE_KEY);
+    const raw = this.platform.storageGet(ADS_STORAGE_KEY);
     if (!raw) return empty;
     try {
       const s = JSON.parse(raw) as AdState;
@@ -154,6 +154,6 @@ export class AdService {
   }
 
   private save(): void {
-    this.platform.storageSet(STORAGE_KEY, JSON.stringify(this.state));
+    this.platform.storageSet(ADS_STORAGE_KEY, JSON.stringify(this.state));
   }
 }

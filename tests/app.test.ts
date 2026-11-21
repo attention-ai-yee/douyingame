@@ -24,7 +24,8 @@ class MemPlatform implements Platform {
   showInterstitial = async () => true;
   vibrateShort() {}
   reportEvent = (name: string, _d: EventData) => void this.events.push(name);
-  launchInfo = () => ({ scene: '1001', query: {} });
+  query: Record<string, string> = {};
+  launchInfo = () => ({ scene: '1001', query: this.query });
   systemInfo = () => ({ platform: 'test', appName: 'test', screenWidth: 750, screenHeight: 1334 });
 }
 
@@ -66,5 +67,35 @@ describe('App 启动、存档、前后台', () => {
     clock.advance(1000);
     App.update(1);
     expect(p.store.ysh_save_v1).toBeDefined();
+  });
+
+  it('三种清档方式：Boot 勾选、网址 ?reset=1、清档重开按钮（清档后切后台不会把旧进度写回）', () => {
+    const clock = new FakeClock();
+    const p = new MemPlatform(clock);
+    App.boot(files(), p);
+    App.core.state.stage = 25;
+    App.save();
+
+    App.boot(files(), p, { resetSave: true });
+    expect(App.core.state.stage).toBe(0);
+
+    App.core.state.stage = 30;
+    App.save();
+    p.query = { reset: '1' };
+    App.boot(files(), p);
+    expect(App.core.state.stage).toBe(0);
+    p.query = {};
+
+    App.core.state.stage = 40;
+    App.save();
+    let restarted = false;
+    App.resetAndRestart(() => {
+      restarted = true;
+      p.hide.forEach((cb) => cb()); // 刷新页面时会触发切后台
+    });
+    expect(restarted).toBe(true);
+    expect(p.store.ysh_save_v1).toBeUndefined();
+    App.boot(files(), p);
+    expect(App.core.state.stage).toBe(0);
   });
 });
