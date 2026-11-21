@@ -17,6 +17,7 @@
     "client/assets/scripts/platform/**/*.ts",
     "client/assets/scripts/app/**/*.ts",
     "client/assets/scripts/view/reveal/RevealGeometry.ts",
+    "client/assets/scripts/view/main/BattleSim.ts",
     "tests/**/*.ts"
   ]
 }

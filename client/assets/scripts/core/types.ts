@@ -79,6 +79,8 @@ export interface RevealBehavior {
 
 export interface BeastDef {
   id: string;
+  /** 头像上的代表字（占位头像、美术生成器用）。 */
+  glyph?: string;
   name: string;
   element: Element;
   rarity: Rarity;
