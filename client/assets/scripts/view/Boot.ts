@@ -1,4 +1,4 @@
-import { _decorator, Component, JsonAsset, Label, Node, resources } from 'cc';
+import { _decorator, Canvas, Color, Component, Graphics, JsonAsset, Label, Layers, Node, resources } from 'cc';
 import { App } from '../app/App';
 import { formatNumber } from '../core';
 
@@ -26,6 +26,8 @@ export class Boot extends Component {
   private autoTimer = 0;
 
   start(): void {
+    console.log('[Boot] 开始启动');
+    if (!this.node.getComponent(Canvas)) console.warn('[Boot] Boot 没有挂在 Canvas 节点上，调试面板可能显示不出来');
     if (this.showDebug && !this.debugLabel) this.debugLabel = this.createDebugLabel();
     resources.loadDir('config', JsonAsset, (err: Error | null, assets: JsonAsset[]) => {
       if (err) {
@@ -35,7 +37,9 @@ export class Boot extends Component {
       }
       const files: Record<string, unknown> = {};
       for (const a of assets) files[a.name] = a.json;
+      console.log(`[Boot] 已加载配置表：${Object.keys(files).join(', ')}`);
       App.boot(files);
+      console.log(`[Boot] 启动完成：平台 ${App.platform.name}，关卡 ${App.core.state.stage}，配置错误 ${App.configErrors.length} 条`);
     });
   }
 
@@ -88,13 +92,27 @@ export class Boot extends Component {
     return lines.join('\n');
   }
 
+  /**
+   * 代码创建的节点默认在 DEFAULT 层，而 Canvas 的 UI 摄像机只渲染 UI_2D 层，
+   * 所以必须手动把 layer 设成 UI_2D，否则节点存在但看不见。
+   */
   private createDebugLabel(): Label {
+    const panel = new Node('DebugPanel');
+    panel.layer = Layers.Enum.UI_2D;
+    this.node.addChild(panel);
+    panel.setPosition(0, 150);
+    const bg = panel.addComponent(Graphics);
+    bg.fillColor = new Color(0, 0, 0, 180);
+    bg.roundRect(-340, -170, 680, 340, 16);
+    bg.fill();
+
     const node = new Node('DebugLabel');
-    this.node.addChild(node);
-    node.setPosition(0, 300);
+    node.layer = Layers.Enum.UI_2D;
+    panel.addChild(node);
     const label = node.addComponent(Label);
-    label.fontSize = 24;
-    label.lineHeight = 34;
+    label.fontSize = 26;
+    label.lineHeight = 40;
+    label.color = new Color(255, 255, 255, 255);
     label.horizontalAlign = Label.HorizontalAlign.LEFT;
     label.string = '加载中…';
     return label;
