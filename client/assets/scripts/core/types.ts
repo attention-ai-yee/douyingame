@@ -81,6 +81,8 @@ export interface BeastDef {
   id: string;
   /** 头像上的代表字（占位头像、美术生成器用）。 */
   glyph?: string;
+  /** 立绘朝向，默认朝右；朝左的在战斗里自动翻转。 */
+  facing?: 'left' | 'right';
   name: string;
   element: Element;
   rarity: Rarity;

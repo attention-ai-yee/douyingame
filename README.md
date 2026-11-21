@@ -12,6 +12,7 @@
 - 清单与 ChatGPT 提示词：[docs/美术素材清单.md](docs/美术素材清单.md)
 - 原图上传到 `art/inbox/`（文件名用清单里的中文名），然后运行 `python3 tools/art/import.py`：自动去纯色背景、裁边、缩放压缩，放进 `client/assets/resources/skin/`，原图挪到 `art/originals/`。`--status` 只看进度。
 - 界面按文件名取图（`beast_jiuweihu`、`bg_battle_nanshan` 等），缺图时显示占位，换图不用改代码。
+- 立绘默认朝右。朝左的在 `beasts.json` 里加 `"facing": "left"`，战斗里我方会自动转向朝右、敌人朝左。
 
 ## 目录结构
 
@@ -71,7 +72,7 @@ npm run sim          # 数值模拟：python3 tools/sim/sim.py，可加 --days 1
 
 - **拍符练习**：「更多」页签里的按钮。可以用 ◀ ▶ 切换 20 只异兽，体验各自的现身方式；拍完会显示每一拍离绿区中心多少毫秒，不发奖励、不影响存档。适合找朋友试手感。
 - **正式拍符**：在 `Boot` 组件上**取消勾选 autoPlay**。之后十连抽到稀有或传说、遇到野生异兽、Boss 收服、签到领到稀有兽时，会自动弹出拍符界面。勾选 autoPlay 时会自动跳过拍符（按 1 印结算）。
-- 拍符界面全部由代码绘制（色块代替美术），代码在 `view/reveal/`；其中可单测的计算在 `RevealGeometry.ts`。
+- 拍符界面中间显示异兽立绘，圆环、符箓和特效由代码绘制，代码在 `view/reveal/`；其中可单测的计算在 `RevealGeometry.ts`。
 
 ### 清档（从头开始）
 
@@ -109,11 +110,11 @@ npm run sim          # 数值模拟：python3 tools/sim/sim.py，可加 --days 1
 
 - 主界面（Q 版）：顶栏货币、关卡条、上半屏自动战斗演出（推图/挂机/Boss/失败面板与助战广告）、右上签到/宝箱/野遇、
   上阵阵位与一键升级、底部 5 个页签（战斗、异兽、进山、图鉴、更多）、离线收益/七日签到/十连结果/概率说明弹窗
-- Q 版界面元素由 `tools/art/generate.cjs` 生成；异兽立绘和背景等 ChatGPT 出图后用 `tools/art/import.py` 导入
+- Q 版界面元素由 `tools/art/generate.cjs` 生成
+- 20 只异兽立绘 + 3 张战斗背景（ChatGPT 出图，`tools/art/import.py` 导入，合计约 860KB）：战斗、拍符、异兽、图鉴（剪影）、十连结果都已用上
 
 **待开发（按 MVP-0 优先级）**
-1. 异兽立绘与战斗背景（ChatGPT 出图中，见 docs/美术素材清单.md）
-2. 实时自动战斗模块（现在胜负按"战力 ≥ 敌方"判定，演出见 `view/main/BattleSim.ts`）
-3. 十连揭晓动画（雾色预告、逐张翻牌）、异兽详情页
-4. 新手引导（含第 10 关小 Boss 的新手节奏问题）
-5. 音效、首包与分包
+1. 实时自动战斗模块（现在胜负按"战力 ≥ 敌方"判定，演出见 `view/main/BattleSim.ts`）
+2. 十连揭晓动画（雾色预告、逐张翻牌）、异兽详情页
+3. 新手引导（含第 10 关小 Boss 的新手节奏问题）
+4. 音效、首包与分包（立绘约 860KB，首包只放南山 7 只，其余放分包）

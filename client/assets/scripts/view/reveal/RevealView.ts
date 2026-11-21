@@ -1,6 +1,7 @@
 import { _decorator, Component, Graphics, Label, Node } from 'cc';
 import { App } from '../../app/App';
 import { BeastDef, RevealSession, Rng, ThrowResult } from '../../core';
+import { setSprite, Skin } from '../ui/Skin';
 import { Button, hex, makeButton, makeFullScreen, makeGraphics, makeLabel, setLabel, strokePolyline, uiNode, visibleSize } from '../ui/UiKit';
 import { arcPoints, JUDGE_COLOR, JUDGE_TEXT, polar, sealsText, visualState } from './RevealGeometry';
 
@@ -71,6 +72,7 @@ export class RevealView extends Component {
 
   private root!: Node;
   private beastG!: Graphics;
+  private beastArt!: Node;
   private ringG!: Graphics;
   private overlayG!: Graphics;
   private marker!: Node;
@@ -102,6 +104,7 @@ export class RevealView extends Component {
     this.root = uiNode('Root', this.node);
     this.beastG = makeGraphics(this.root, 'Beast');
     this.beastLabel = makeLabel(this.beastG.node, '', 30, '#ffffff');
+    this.beastArt = uiNode('Art', this.root);
     this.ringG = makeGraphics(this.root, 'Ring');
     this.marker = uiNode('Marker', this.root);
     const mg = this.marker.addComponent(Graphics);
@@ -169,15 +172,28 @@ export class RevealView extends Component {
     const br = this.radius * 0.42;
     const g = this.beastG;
     g.clear();
-    g.fillColor = hex(el.color, this.opts.shiny ? 255 : 220);
-    g.circle(0, 0, br);
-    g.fill();
-    g.lineWidth = 8;
-    g.strokeColor = hex(rar.color);
-    g.circle(0, 0, br);
-    g.stroke();
-    // 金白色的五行（金）底色较浅，名字用深色
-    this.beastLabel.color = hex(beast.element === 'jin' ? '#333333' : '#ffffff');
+    const art = `beast_${beast.id}`;
+    if (Skin.has(art)) {
+      // 有立绘：圆内放一圈淡淡的五行色光晕，立绘放在中间
+      g.fillColor = hex(el.color, 70);
+      g.circle(0, 0, this.radius * 0.78);
+      g.fill();
+      setLabel(this.beastLabel, '');
+      this.beastArt.active = true;
+      const size = this.radius * 1.45;
+      setSprite(this.beastArt, art, size, size);
+    } else {
+      this.beastArt.active = false;
+      g.fillColor = hex(el.color, this.opts.shiny ? 255 : 220);
+      g.circle(0, 0, br);
+      g.fill();
+      g.lineWidth = 8;
+      g.strokeColor = hex(rar.color);
+      g.circle(0, 0, br);
+      g.stroke();
+      // 金白色的五行（金）底色较浅，名字用深色
+      this.beastLabel.color = hex(beast.element === 'jin' ? '#333333' : '#ffffff');
+    }
 
     App.analytics.track('reveal_start', { beast: beast.id, rarity: beast.rarity, practice: this.opts.practice, boss: this.opts.isBoss });
   }
@@ -275,6 +291,7 @@ export class RevealView extends Component {
     const introP = this.phase === 'intro' ? Math.min(1, (now - this.phaseStart) / INTRO_MS) : 1;
     const sc = 0.6 + 0.4 * introP;
     this.beastG.node.setScale(sc, sc, 1);
+    this.beastArt.setScale(sc, sc, 1);
 
     const g = this.ringG;
     const o = this.overlayG;
