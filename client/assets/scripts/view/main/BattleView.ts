@@ -1,8 +1,9 @@
-import { _decorator, Component, Label, Node, UIOpacity, UITransform } from 'cc';
+import { _decorator, Component, Graphics, Label, Node, UIOpacity, UITransform } from 'cc';
 import { App } from '../../app/App';
-import { formatNumber, Rarity } from '../../core';
-import { makeSprite, setSprite, setSpriteColor } from '../ui/Skin';
-import { makeLabel, setLabel, uiNode } from '../ui/UiKit';
+import { formatNumber } from '../../core';
+import { BeastIcon, makeBeastIcon } from '../ui/BeastIcon';
+import { makeSprite, setSprite, Skin } from '../ui/Skin';
+import { hex, makeLabel, setLabel, uiNode } from '../ui/UiKit';
 import { floatText, skinButton, SkinButton } from '../ui/Widgets';
 import { BattleSim, HitEvent } from './BattleSim';
 
@@ -10,18 +11,18 @@ const { ccclass } = _decorator;
 
 /** 战斗区域内的站位（以战斗区域中心为原点）。前排 2 个、后排 3 个。 */
 const ALLY_POS: [number, number][] = [
-  [-115, 10],
-  [-115, -150],
-  [-255, 90],
-  [-255, -70],
-  [-255, -225],
+  [-115, -10],
+  [-115, -165],
+  [-255, 60],
+  [-255, -90],
+  [-255, -235],
 ];
 const UNIT = 104;
 const HP_W = 100;
 
 interface UnitView {
   root: Node;
-  portrait: Node;
+  icon: BeastIcon;
   hpFill: Node;
   baseX: number;
   baseY: number;
@@ -76,10 +77,11 @@ export class BattleView extends Component {
     this.host = host;
     this.w = w;
     this.h = h;
-    this.bg = makeSprite(this.node, 'bg_battle_nanshan', w, h, 0, 0, { fallback: '#cfc6ae' });
+    this.bg = uiNode('Bg', this.node);
     this.unitsRoot = uiNode('Units', this.node);
     this.fxRoot = uiNode('Fx', this.node);
-    this.banner = makeLabel(this.node, '', 34, '#3b2a12', 0, h / 2 - 60);
+    const bannerBg = makeSprite(this.node, 'pill', 300, 52, -w / 2 + 170, h / 2 - 50, { fallback: '#fffaf0', alpha: 230 });
+    this.banner = makeLabel(bannerBg, '', 26, '#4a2f27', 0, 0);
     this.bossBtn = skinButton(this.node, 'btn_red', '挑战 Boss', 300, 92, () => this.requestBoss(), 0, -h / 2 + 58);
     this.bossBtn.node.active = false;
     // 战斗区域本身吃掉点击，避免误触到下面
@@ -257,18 +259,16 @@ export class BattleView extends Component {
   }
 
   private makeUnit(beastId: string, x: number, y: number, dir: number, enemy: boolean, scale: number): UnitView {
-    const def = App.core.idx.beast[beastId];
     const root = uiNode('Unit', this.unitsRoot, x, y);
     root.setScale(scale, scale, 1);
-    const portrait = makeSprite(root, `beast_${beastId}`, UNIT, UNIT, 0, 0, { fallback: '#8a7a5a', color: enemy ? '#8c7a96' : undefined });
-    const rarity: Rarity = enemy ? 'fan' : def.rarity;
-    makeSprite(root, `frame_${rarity}`, UNIT * 1.2, UNIT * 1.2, 0, 0, { optional: true, color: enemy ? '#c0392b' : undefined });
-    makeSprite(root, 'hp_bg', HP_W, 16, 0, -UNIT / 2 - 22, { fallback: '#111111' });
-    const hpFill = makeSprite(root, enemy ? 'hp_red' : 'hp_green', HP_W - 4, 12, -(HP_W - 4) / 2, -UNIT / 2 - 22, { fallback: enemy ? '#c0392b' : '#2e9e62' });
+    // 立绘统一朝右；敌人镜像朝左
+    const icon = makeBeastIcon(root, beastId, UNIT * 1.25, 0, 6, { frame: null, enemy });
+    if (enemy) icon.portrait.setScale(-1, 1, 1);
+    makeSprite(root, 'hp_bg', HP_W, 20, 0, -UNIT / 2 - 20, { fallback: '#ffffff' });
+    const hpFill = makeSprite(root, enemy ? 'hp_red' : 'hp_green', HP_W - 8, 12, -(HP_W - 8) / 2, -UNIT / 2 - 20, { fallback: enemy ? '#ff5a5a' : '#3fcf7f' });
     const ut = hpFill.getComponent(UITransform);
     if (ut) ut.setAnchorPoint(0, 0.5);
-    makeLabel(root, def.name, 20, enemy ? '#7f1a14' : '#1f1b16', 0, UNIT / 2 + 14);
-    return { root, portrait, hpFill, baseX: x, baseY: y, dir, lunge: 0, flash: 0, dead: false, scale };
+    return { root, icon, hpFill, baseX: x, baseY: y, dir, lunge: 0, flash: 0, dead: false, scale };
   }
 
   private playHit(e: HitEvent): void {
@@ -294,7 +294,7 @@ export class BattleView extends Component {
       for (let i = 0; i < views.length; i++) {
         const frac = units[i] ? Math.max(0, units[i].hp / units[i].maxHp) : 0;
         const ut = views[i].hpFill.getComponent(UITransform);
-        if (ut) ut.setContentSize(Math.max(0.001, (HP_W - 4) * frac), 12);
+        if (ut) ut.setContentSize(Math.max(0.001, (HP_W - 8) * frac), 12);
       }
     };
     set(this.allies, sim.allies);
@@ -307,8 +307,7 @@ export class BattleView extends Component {
       u.flash = Math.max(0, u.flash - dt);
       const k = u.lunge > 0 ? Math.sin((1 - u.lunge / 0.18) * Math.PI) : 0;
       u.root.setPosition(u.baseX + u.dir * 30 * k, u.baseY);
-      const enemyTint = u.dir < 0 ? '#8c7a96' : '#ffffff';
-      setSpriteColor(u.portrait, u.flash > 0 ? '#ff8a80' : enemyTint, 255);
+      u.icon.tint(u.flash > 0 ? '#ff8a80' : 'normal');
       if (u.dead) {
         const op = u.root.getComponent(UIOpacity) || u.root.addComponent(UIOpacity);
         op.opacity = Math.max(60, op.opacity - Math.round(dt * 600));
@@ -322,7 +321,22 @@ export class BattleView extends Component {
     const name = `bg_battle_${m ? m.id : 'nanshan'}`;
     if (name !== this.bgName) {
       this.bgName = name;
-      setSprite(this.bg, name, this.w, this.h, { fallback: '#cfc6ae' });
+      if (Skin.has(name)) {
+        setSprite(this.bg, name, this.w, this.h);
+      } else {
+        // 背景图还没到：蓝天 + 草地占位
+        const g = this.bg.getComponent(Graphics) || this.bg.addComponent(Graphics);
+        g.clear();
+        g.fillColor = hex('#bfe6ff');
+        g.rect(-this.w / 2, -this.h / 2, this.w, this.h);
+        g.fill();
+        g.fillColor = hex('#c9eba0');
+        g.rect(-this.w / 2, -this.h / 2, this.w, this.h * 0.42);
+        g.fill();
+        g.fillColor = hex('#4a2f27');
+        g.rect(-this.w / 2, -this.h / 2 + this.h * 0.42 - 2, this.w, 4);
+        g.fill();
+      }
     }
   }
 }
