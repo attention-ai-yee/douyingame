@@ -1,0 +1,21 @@
+{
+  "_doc": "7 日签到。对应 游戏设计文档 10.2 节。断签不重置，只顺延。",
+  "firstRound": [
+    { "day": 1, "beast": "jiuweihu" },
+    { "day": 2, "tickets": 10 },
+    { "day": 3, "choice": ["dijiang", "chiru", "zheng"] },
+    { "day": 4, "wild": { "ling": 4 }, "goldMinutes": 60 },
+    { "day": 5, "tickets": 10 },
+    { "day": 6, "wild": { "xi": 2 }, "goldMinutes": 60 },
+    { "day": 7, "beast": "yinglong" }
+  ],
+  "laterRounds": [
+    { "day": 1, "tickets": 5 },
+    { "day": 2, "goldMinutes": 60 },
+    { "day": 3, "wild": { "ling": 2 } },
+    { "day": 4, "tickets": 5 },
+    { "day": 5, "goldMinutes": 120 },
+    { "day": 6, "wild": { "xi": 1 } },
+    { "day": 7, "wild": { "chuanshuo": 2 } }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "_doc": "兽池、探索度、保底。对应 游戏设计文档 第 4 节。tiers 中每项为 [异兽id, 权重]，本地兽 3、流窜兽 1。",
+  "mountains": [
+    { "id": "nanshan", "name": "南山", "chapter": 1,
+      "tiers": {
+        "fan":       [["lushu", 3], ["shengsheng", 3], ["huahuai", 3], ["lei", 3], ["xuangui", 3]],
+        "ling":      [["chiru", 3], ["dangkang", 1], ["dijiang", 1]],
+        "xi":        [["jiuweihu", 3]],
+        "chuanshuo": [["fenghuang", 3]]
+      } },
+    { "id": "xishan", "name": "西山", "chapter": 2,
+      "tiers": {
+        "fan":       [["tiangou", 3], ["lushu", 1], ["shengsheng", 1], ["huahuai", 1]],
+        "ling":      [["zheng", 3], ["huan", 3], ["bo", 3], ["dijiang", 3]],
+        "xi":        [["bifang", 3], ["luanniao", 3], ["luwu", 3]],
+        "chuanshuo": [["fenghuang", 1]]
+      } },
+    { "id": "beidongzhong", "name": "北山·东山·中山", "chapter": 3,
+      "tiers": {
+        "fan":       [["lei", 1], ["xuangui", 1], ["tiangou", 1], ["huahuai", 1]],
+        "ling":      [["dangkang", 3], ["fuzhu", 3], ["chiru", 1], ["zheng", 1]],
+        "xi":        [["taotie", 3], ["jiuweihu", 1], ["bifang", 1], ["luanniao", 1]],
+        "chuanshuo": [["yinglong", 3], ["fenghuang", 1]]
+      } }
+  ],
+  "depths": {
+    "shallow": { "name": "浅山", "rates": { "fan": 0.70, "ling": 0.27, "xi": 0.03, "chuanshuo": 0.00 } },
+    "deep":    { "name": "深山", "rates": { "fan": 0.57, "ling": 0.34, "xi": 0.08, "chuanshuo": 0.01 } },
+    "secret":  { "name": "秘境", "rates": { "fan": 0.47, "ling": 0.38, "xi": 0.12, "chuanshuo": 0.03 } }
+  },
+  "deepUnlockWithinChapter": 20,
+  "pity": { "xi": 30, "chuanshuo": 90 },
+  "tenPullMinRarity": "ling",
+  "shinyRate": 0.01,
+  "dailyFreeTenPulls": 1
+}

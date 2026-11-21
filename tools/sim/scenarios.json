@@ -1,0 +1,25 @@
+{
+  "_doc": "模拟用的玩家行为假设，不是游戏配置。时间为 24 小时制的小时数，[开始时间, 在线分钟]。",
+  "seeds": 12,
+  "sessions": {
+    "day1": [[20, 25], [23, 8]],
+    "daily": [[8, 6], [12.5, 8], [19, 12], [22.5, 6]]
+  },
+  "players": {
+    "ad": {
+      "label": "看广告型：每次都看离线翻倍，每天 3 次看视频得进山符，卡 Boss 会用助战",
+      "watchAds": true,
+      "day1AdTicketViews": 2,
+      "adTicketViews": 3
+    },
+    "noad": {
+      "label": "不看广告型：不看任何广告",
+      "watchAds": false,
+      "day1AdTicketViews": 0,
+      "adTicketViews": 0
+    }
+  },
+  "tutorialBeasts": ["lei", "jiuweihu", "lushu", "lei"],
+  "sealBonusChance": 0.5,
+  "awakenFromDay": 35
+}

@@ -1,0 +1,25 @@
+{
+  "_doc": "现身拍符。对应 游戏设计文档 5.3 节。perfectMs 为完美区时长（毫秒），speed 为基础转速（圈/秒）。完美区角度 = 当前这一拍的最高转速 × 完美区时长，所以变速不会让时间窗口变小。",
+  "throws": 3,
+  "rarity": {
+    "fan":       { "perfectMs": 140, "speed": 0.6 },
+    "ling":      { "perfectMs": 120, "speed": 0.7 },
+    "xi":        { "perfectMs": 110, "speed": 0.8 },
+    "chuanshuo": { "perfectMs": 90,  "speed": 0.9 }
+  },
+  "goodWidthFactor": 1.0,
+  "bossPerfectMinusMs": 10,
+  "minPerfectMs": 70,
+  "legendLastThrowSpeedMult": 1.3,
+  "skipSeals": 1,
+  "rewards": {
+    "twoSeals":   { "goldMinutes": 10 },
+    "threeSeals": { "shards": 1, "dianjingChance": 0.05 }
+  },
+  "trigger": {
+    "pull": ["xi", "chuanshuo"],
+    "wild": ["fan", "ling", "xi", "chuanshuo"],
+    "boss": ["xi", "chuanshuo"],
+    "signin": ["xi", "chuanshuo"]
+  }
+}

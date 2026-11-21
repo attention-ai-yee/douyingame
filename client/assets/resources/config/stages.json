@@ -1,0 +1,36 @@
+{
+  "_doc": "主线与镇妖塔。对应 游戏设计文档 第 8 节、18.4 节。敌人战力 = base × 逐关增长；Boss 系数只作用于该关。",
+  "chapterLength": 40,
+  "chapters": [
+    { "id": 1, "mountain": "nanshan", "name": "南山经",
+      "boss": { "name": "猾褢王", "element": "huo", "captureBeast": null, "rewardTickets": 10 } },
+    { "id": 2, "mountain": "xishan", "name": "西山经",
+      "boss": { "name": "陆吾", "element": "jin", "captureBeast": "luwu", "rewardTickets": 0 } },
+    { "id": 3, "mountain": "beidongzhong", "name": "北山经·东山经·中山经",
+      "boss": { "name": "饕餮", "element": "tu", "captureBeast": "taotie", "rewardTickets": 0 } }
+  ],
+  "enemy": {
+    "base": 450,
+    "segments": [
+      { "from": 2,  "to": 20,  "growth": 1.14 },
+      { "from": 21, "to": 40,  "growth": 1.18 },
+      { "from": 41, "to": 80,  "growth": 1.105 },
+      { "from": 81, "to": 120, "growth": 1.09 }
+    ],
+    "smallBossEvery": 10,
+    "smallBossMult": 1.2,
+    "chapterBossMult": 1.4,
+    "tutorialFixedStages": 3
+  },
+  "rewards": { "smallBossTickets": 3 },
+  "tower": {
+    "unlockStage": 40,
+    "baseStage": 40,
+    "growth": 1.03,
+    "bossEvery": 10,
+    "bossMult": 1.15,
+    "postMainStagePerFloor": 0.45,
+    "quickChallengeRatio": 1.5,
+    "rewards": { "ticketsEvery": 5, "tickets": 2, "lingWildEvery": 10, "xiWildEvery": 50 }
+  }
+}

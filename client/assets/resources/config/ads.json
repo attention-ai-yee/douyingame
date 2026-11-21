@@ -1,0 +1,19 @@
+{
+  "_doc": "广告位。对应 游戏设计文档 第 12 节。adUnitId 在抖音开放平台开通流量主、创建广告位后填写；留空时开发环境用模拟广告。dailyCap 为 null 表示不限（由其他规则限制）。",
+  "defaultRewardedAdUnitId": "",
+  "interstitialAdUnitId": "",
+  "noFillRewardRatio": 0.5,
+  "rewarded": {
+    "offline_double":       { "name": "离线收益翻倍",   "dailyCap": null, "since": "mvp0" },
+    "tickets":              { "name": "看视频得进山符", "dailyCap": 4,    "since": "mvp0", "tickets": 5 },
+    "assist":               { "name": "召唤助战",       "dailyCap": 5,    "since": "mvp0" },
+    "reveal_retry":         { "name": "再拍一轮",       "dailyCap": 3,    "since": "mvp1" },
+    "boss_capture_double":  { "name": "收服奖励翻倍",   "dailyCap": null, "since": "mvp1" },
+    "chest":                { "name": "符箓宝箱",       "dailyCap": 3,    "since": "mvp1" },
+    "idle_boost":           { "name": "挂机加速",       "dailyCap": 3,    "since": "mvp1", "minutes": 120 },
+    "signin_double":        { "name": "签到双倍",       "dailyCap": 1,    "since": "mvp1" },
+    "realm_extra":          { "name": "秘境加次数",     "dailyCap": 2,    "since": "v1.2" },
+    "weekly_boss_extra":    { "name": "每周 Boss 加次数", "dailyCap": 1,  "since": "v1.3" }
+  },
+  "interstitial": { "minIntervalSec": 180, "newUserGraceSec": 600, "dailyCap": 6 }
+}
