@@ -57,7 +57,7 @@ export function skinButton(
 export function currencyPill(parent: Node, icon: string, x: number, y: number, w = 220): Label {
   const n = makeSprite(parent, 'pill', w, 60, x, y, { fallback: '#16181d', alpha: 210 });
   makeSprite(n, icon, 56, 56, -w / 2 + 30, 0, { fallback: '#c9a227' });
-  const l = makeLabel(n, '0', 28, '#fff4d6', 18, 0);
+  const l = makeLabel(n, '0', 28, '#4a2f27', 18, 0);
   return l;
 }
 

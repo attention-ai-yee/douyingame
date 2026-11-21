@@ -324,10 +324,26 @@ export class GameCore {
     this.events.emit('teamChanged', this.state.team);
   }
 
+  /** 空阵位自动补上还没上阵的异兽（新获得异兽、开放新阵位后调用）。 */
+  fillEmptySlots(): number {
+    const n = progression.fillEmptySlots(this.ctx());
+    if (n) this.events.emit('teamChanged', this.state.team);
+    return n;
+  }
+
   setTeam(team: (string | null)[]): boolean {
     const ok = progression.setTeam(this.ctx(), team);
     if (ok) this.events.emit('teamChanged', this.state.team);
     return ok;
+  }
+
+  canStarUp(beastId: string, useWild = false): boolean {
+    return collection.canStarUp(this.ctx(), beastId, useWild);
+  }
+
+  /** 下一星需要的星魄，满星返回 null。 */
+  starUpCost(beastId: string): number | null {
+    return collection.starUpCost(this.ctx(), beastId);
   }
 
   starUp(beastId: string, useWild = false): boolean {

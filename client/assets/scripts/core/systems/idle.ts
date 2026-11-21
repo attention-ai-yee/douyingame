@@ -42,9 +42,14 @@ export function computeOffline(ctx: Ctx): OfflineResult {
   if (raw < 0) {
     return { ms: 0, rawMs: raw, gold: 0, clockRollback: true };
   }
+  tickWildClock(ctx, raw);
+  if (raw < (g.offlineMinMinutes || 0) * MIN) {
+    // 离开太短：按在线挂机直接入账，不弹离线收益
+    ctx.s.gold += (idleGoldPerMin(ctx) * raw) / MIN;
+    return { ms: 0, rawMs: raw, gold: 0, clockRollback: false };
+  }
   const ms = Math.min(raw, g.offlineCapHours * HOUR);
   const gold = ((idleGoldPerMin(ctx) * ms) / MIN) * g.offlineRatio;
-  tickWildClock(ctx, raw);
   if (gold > 0) {
     const prev = ctx.s.pendingOffline;
     ctx.s.pendingOffline = { ms: (prev ? prev.ms : 0) + ms, gold: (prev ? prev.gold : 0) + gold };

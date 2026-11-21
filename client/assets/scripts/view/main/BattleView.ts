@@ -263,7 +263,7 @@ export class BattleView extends Component {
     root.setScale(scale, scale, 1);
     // 立绘统一朝右；敌人镜像朝左
     const icon = makeBeastIcon(root, beastId, UNIT * 1.25, 0, 6, { frame: null, enemy });
-    if (enemy) icon.portrait.setScale(-1, 1, 1);
+    if (enemy && Skin.has(`beast_${beastId}`)) icon.portrait.setScale(-1, 1, 1);
     makeSprite(root, 'hp_bg', HP_W, 20, 0, -UNIT / 2 - 20, { fallback: '#ffffff' });
     const hpFill = makeSprite(root, enemy ? 'hp_red' : 'hp_green', HP_W - 8, 12, -(HP_W - 8) / 2, -UNIT / 2 - 20, { fallback: enemy ? '#ff5a5a' : '#3fcf7f' });
     const ut = hpFill.getComponent(UITransform);

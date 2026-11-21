@@ -28,7 +28,8 @@
     "treasureEvery": 5,
     "treasureMult": 2,
     "offlineRatio": 0.6,
-    "offlineCapHours": 8
+    "offlineCapHours": 8,
+    "offlineMinMinutes": 1
   },
   "assist": { "powerMult": 1.3, "dailyCap": 5 },
   "wild": { "stageClearChance": 0.15, "idleEveryHours": 2, "idleStoreCap": 3, "dailyCap": 5 },

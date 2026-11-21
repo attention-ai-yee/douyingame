@@ -136,6 +136,8 @@ export interface ProgressionConfig {
     treasureMult: number;
     offlineRatio: number;
     offlineCapHours: number;
+    /** 离线不足这么多分钟不算离线收益（避免刚启动就弹"离开了 0 分"）。 */
+    offlineMinMinutes: number;
   };
   assist: { powerMult: number; dailyCap: number };
   wild: { stageClearChance: number; idleEveryHours: number; idleStoreCap: number; dailyCap: number };

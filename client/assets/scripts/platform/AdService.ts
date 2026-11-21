@@ -59,6 +59,12 @@ export class AdService {
     return def.dailyCap === null ? null : Math.max(0, def.dailyCap - (this.state.counts[placement] || 0));
   }
 
+  /** 今天已经看过几次（离线翻倍"每天首次 ×3"用）。 */
+  countToday(placement: string): number {
+    this.rollDay();
+    return this.state.counts[placement] || 0;
+  }
+
   /** 广告入口展示给玩家时调用（用来算点击率）。 */
   markOffered(placement: string): void {
     this.analytics.track('ad_offer_show', { placement });

@@ -27,6 +27,18 @@ describe('挂机与离线', () => {
     expect(core.state.pendingOffline).toBeNull();
   });
 
+  it('离开不到 1 分钟：直接按在线入账，不弹离线收益', () => {
+    const { core, clock } = makeCore();
+    core.resume();
+    core.pause();
+    clock.advance(30 * 1000);
+    const before = core.state.gold;
+    const res = core.resume();
+    expect(res.gold).toBe(0);
+    expect(core.state.pendingOffline).toBeNull();
+    expect(core.state.gold).toBeCloseTo(before + core.goldPerMin() / 2, 6);
+  });
+
   it('系统时间被往回调时，离线收益为 0', () => {
     const { core, clock } = makeCore();
     core.resume();
@@ -70,6 +82,15 @@ describe('推图、阵位、镇妖塔', () => {
     for (let i = 0; i < 5; i++) if (core.challengeStage().win) wins++;
     expect(wins).toBeGreaterThan(0);
     expect(core.state.stage).toBe(wins);
+  });
+
+  it('空阵位自动补上新异兽，已上阵的不动', () => {
+    const { core } = makeCore();
+    core.state.beasts.jiuweihu = { star: 1, shards: 0, awaken: 0, shiny: false, obtainedAt: 0 };
+    core.state.beasts.lushu = { star: 1, shards: 0, awaken: 0, shiny: false, obtainedAt: 0 };
+    expect(core.fillEmptySlots()).toBe(2);
+    expect(core.state.team.slice(0, 3)).toEqual(['lei', 'jiuweihu', 'lushu']);
+    expect(core.fillEmptySlots()).toBe(0);
   });
 
   it('一键升级优先升最便宜的阵位', () => {

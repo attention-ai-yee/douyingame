@@ -38,6 +38,24 @@ export function bestTeam(ctx: Ctx): (string | null)[] {
   return team;
 }
 
+/** 把还没上阵的异兽按战力填进空着的阵位（不动已上阵的）。返回填了几只。 */
+export function fillEmptySlots(ctx: Ctx): number {
+  const k = slotsAvailable(ctx);
+  const onTeam: Record<string, boolean> = {};
+  for (const id of ctx.s.team) if (id) onTeam[id] = true;
+  const spare = Object.keys(ctx.s.beasts)
+    .filter((id) => !onTeam[id])
+    .sort((a, b) => unitPowerOf(ctx, b) - unitPowerOf(ctx, a));
+  let n = 0;
+  for (let i = 0; i < k && spare.length; i++) {
+    if (!ctx.s.team[i] || !ctx.s.beasts[ctx.s.team[i] as string]) {
+      ctx.s.team[i] = spare.shift() as string;
+      n++;
+    }
+  }
+  return n;
+}
+
 export function setTeam(ctx: Ctx, team: (string | null)[]): boolean {
   const k = slotsAvailable(ctx);
   const used: Record<string, boolean> = {};
