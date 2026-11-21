@@ -9,6 +9,7 @@ import { BagPopup } from './BagPopup';
 import { BattleView } from './BattleView';
 import { BeastDetail } from './BeastDetail';
 import { itemName, makeItemIcon } from './ItemIcon';
+import { LootFly } from './LootFly';
 import { BeastsPage, BookPage, describePull, MainHooks, MorePage, MountainPage, Page, PageHost } from './Pages';
 import { StageView } from './StageView';
 
@@ -23,33 +24,6 @@ const TABS: { key: TabKey; name: string }[] = [
   { key: 'book', name: '图鉴' },
   { key: 'more', name: '更多' },
 ];
-
-/** 掉落飞向宝箱：从 (x0,y0) 弧线飞到 (x1,y1)，到了以后回调。 */
-@ccclass('LootFly')
-export class LootFly extends Component {
-  x0 = 0;
-  y0 = 0;
-  x1 = 0;
-  y1 = 0;
-  dur = 0.7;
-  onArrive: (() => void) | null = null;
-  private t = 0;
-
-  update(dt: number): void {
-    this.t += dt;
-    const p = Math.min(1, this.t / this.dur);
-    const e = p * p;
-    const x = this.x0 + (this.x1 - this.x0) * e;
-    const y = this.y0 + (this.y1 - this.y0) * e + Math.sin(p * Math.PI) * 120;
-    this.node.setPosition(x, y);
-    const k = 1 - 0.4 * p;
-    this.node.setScale(k, k, 1);
-    if (p >= 1) {
-      if (this.onArrive) this.onArrive();
-      this.node.destroy();
-    }
-  }
-}
 
 /**
  * 主界面（游戏设计文档 13.1）。底部 5 个页签：挂机 / 异兽 / 进山 / 图鉴 / 更多。
