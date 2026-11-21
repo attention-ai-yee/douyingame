@@ -1,4 +1,5 @@
 import { Color, Graphics, ImageAsset, JsonAsset, Node, resources, Sprite, SpriteFrame, UITransform } from 'cc';
+import { loadDirByName } from './LoadDir';
 import { hex, uiNode } from './UiKit';
 
 /**
@@ -21,21 +22,23 @@ export class Skin {
         const imgs = (manifest.json as { images?: Record<string, { inset?: number[] }> }).images || {};
         for (const k in imgs) if (imgs[k].inset) Skin.insets[k] = imgs[k].inset as number[];
       }
-      resources.loadDir('skin', ImageAsset, (e2: Error | null, assets: ImageAsset[]) => {
+      loadDirByName('skin', ImageAsset, (e2: Error | null, imgs: Record<string, ImageAsset>) => {
         if (e2) console.warn('[Skin] 读取皮肤失败，使用占位', e2);
-        for (const img of assets || []) {
-          const sf = SpriteFrame.createWithImage(img);
-          const ins = Skin.insets[img.name];
+        for (const name in imgs) {
+          const sf = SpriteFrame.createWithImage(imgs[name]);
+          const ins = Skin.insets[name];
           if (ins) {
             sf.insetLeft = ins[0];
             sf.insetTop = ins[1];
             sf.insetRight = ins[2];
             sf.insetBottom = ins[3];
           }
-          Skin.frames[img.name] = sf;
+          Skin.frames[name] = sf;
         }
         Skin.loaded = true;
-        console.log(`[Skin] 已加载 ${Object.keys(Skin.frames).length} 张素材`);
+        const names = Object.keys(Skin.frames);
+        const beasts = names.filter((n) => n.startsWith('beast_')).length;
+        console.log(`[Skin] 已加载 ${names.length} 张素材（异兽立绘 ${beasts} 张）`);
         done();
       });
     });

@@ -1,8 +1,9 @@
-import { _decorator, Canvas, Component, JsonAsset, resources } from 'cc';
+import { _decorator, Canvas, Component, JsonAsset } from 'cc';
 import { App } from '../app/App';
 import { formatNumber, PendingReveal, RevealReward } from '../core';
 import { MainView } from './main/MainView';
 import { RevealView } from './reveal/RevealView';
+import { loadDirByName } from './ui/LoadDir';
 import { Skin } from './ui/Skin';
 
 const { ccclass, property } = _decorator;
@@ -52,13 +53,13 @@ export class Boot extends Component {
         },
       });
     };
-    resources.loadDir('config', JsonAsset, (err: Error | null, assets: JsonAsset[]) => {
+    loadDirByName('config', JsonAsset, (err: Error | null, assets: Record<string, JsonAsset>) => {
       if (err) {
         console.error('[Boot] 加载配置表失败', err);
         return;
       }
       const f: Record<string, unknown> = {};
-      for (const a of assets) f[a.name] = a.json;
+      for (const name in assets) f[name] = assets[name].json;
       files = f;
       tryBoot();
     });
