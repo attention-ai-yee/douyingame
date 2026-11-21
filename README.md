@@ -7,6 +7,12 @@
 - 设计文档：[docs/游戏设计文档.md](docs/游戏设计文档.md)
 - 运营文档：[docs/运营文档.md](docs/运营文档.md)
 
+## 美术素材
+
+- 清单与 ChatGPT 提示词：[docs/美术素材清单.md](docs/美术素材清单.md)
+- 原图上传到 `art/inbox/`（文件名用清单里的中文名），然后运行 `python3 tools/art/import.py`：自动去纯色背景、裁边、缩放压缩，放进 `client/assets/resources/skin/`，原图挪到 `art/originals/`。`--status` 只看进度。
+- 界面按文件名取图（`beast_jiuweihu`、`bg_battle_nanshan` 等），缺图时显示占位，换图不用改代码。
+
 ## 目录结构
 
 ```
