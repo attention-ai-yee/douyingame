@@ -159,7 +159,8 @@ export class MainView extends Component implements PageHost {
     const page = this.pages[this.current];
     if (page) page.refresh();
     this.maybeShowOffline();
-    if (!this.popupOpen && !this.signinAutoShown && core.canClaimSignin() && !s.pendingOffline) {
+    // 自动模式会自己领签到，不弹窗，免得弹窗里的按钮过期
+    if (!this.popupOpen && !this.signinAutoShown && !this.hooks.getAutoPlay() && core.canClaimSignin() && !s.pendingOffline) {
       this.signinAutoShown = true;
       this.showSignin();
     }
@@ -409,7 +410,12 @@ export class MainView extends Component implements PageHost {
     const reward = list[today];
     const finish = (choice?: string) => {
       const res = core.claimSignin(choice);
-      if (!res) return;
+      if (!res) {
+        // 例如自动模式已经替你领过了：关掉弹窗并说明，不能没反应
+        pop.close();
+        this.toast(core.canClaimSignin() ? '领取失败，请重试' : '今天已经签到过了');
+        return;
+      }
       App.save();
       this.toast(`签到成功：${describeSignin(res.reward, choice)}`);
       pop.close();
