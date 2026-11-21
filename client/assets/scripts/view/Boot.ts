@@ -1,4 +1,5 @@
-import { _decorator, Canvas, Component, JsonAsset } from 'cc';
+import { _decorator, Camera, Canvas, Color, Component, director, Director, JsonAsset, Layers, Node, ResolutionPolicy, UITransform, view } from 'cc';
+import { EDITOR } from 'cc/env';
 import { App } from '../app/App';
 import { formatNumber, PendingReveal, RevealReward } from '../core';
 import { MainView } from './main/MainView';
@@ -9,14 +10,62 @@ import { Skin } from './ui/Skin';
 const { ccclass, property } = _decorator;
 
 const SOURCE_TEXT: Record<string, string> = {
-  pull: '进山 · 异兽现身！',
+  pull: '寻兽 · 异兽现身！',
   wild: '野生异兽出现了！',
   boss: 'Boss 收服',
   signin: '签到 · 师父留下的灵兽',
 };
 
+/** 设计分辨率：竖屏 750×1334，按宽度适配。用代码设置，不依赖项目设置（项目设置丢了也不会变形）。 */
+export function applyDesignResolution(): void {
+  view.setDesignResolutionSize(750, 1334, ResolutionPolicy.FIXED_WIDTH);
+}
+
+/** 找到场景里的 Canvas；没有就用代码建一个（带一台只拍 UI 的正交相机）。 */
+export function ensureCanvas(): Canvas | null {
+  const scene = director.getScene();
+  if (!scene) return null;
+  const found = scene.getComponentInChildren(Canvas);
+  if (found) return found;
+  const node = new Node('Canvas');
+  node.layer = Layers.Enum.UI_2D;
+  scene.addChild(node);
+  const vs = view.getVisibleSize();
+  node.addComponent(UITransform).setContentSize(vs.width, vs.height);
+  const camNode = new Node('UICamera');
+  camNode.layer = Layers.Enum.UI_2D;
+  node.addChild(camNode);
+  camNode.setPosition(0, 0, 1000);
+  const cam = camNode.addComponent(Camera);
+  cam.projection = Camera.ProjectionType.ORTHO;
+  cam.near = 0;
+  cam.far = 2000;
+  cam.priority = 1 << 30;
+  cam.visibility = Layers.Enum.UI_2D;
+  cam.clearFlags = Camera.ClearFlag.SOLID_COLOR;
+  cam.clearColor = new Color(43, 33, 28, 255);
+  const canvas = node.addComponent(Canvas);
+  canvas.cameraComponent = cam;
+  canvas.alignCanvasWithScreen = true;
+  console.warn('[Boot] 场景里没有 Canvas，已用代码创建');
+  return canvas;
+}
+
 /**
- * 启动组件：挂在首个场景的 Canvas 节点上。
+ * 场景加载后检查有没有 Boot：没有（例如本地场景丢了、新建的空场景、Boot 脚本丢失）就自动挂到 Canvas 上。
+ * 这样任何场景都能直接运行游戏，不依赖手工搭的场景。编辑器里不执行，免得改动正在编辑的场景。
+ */
+function autoBoot(): void {
+  const scene = director.getScene();
+  if (!scene || scene.getComponentInChildren(Boot)) return;
+  const canvas = ensureCanvas();
+  if (!canvas) return;
+  console.warn('[Boot] 当前场景没有挂 Boot 组件，已自动挂到 Canvas 上');
+  canvas.node.addComponent(Boot);
+}
+
+/**
+ * 启动组件：挂在首个场景的 Canvas 节点上（没挂也行，见 autoBoot）。
  * 1. 并行加载 resources/config（配置表）和 resources/skin（美术素材），然后 App.boot()；
  * 2. 打开主界面 MainView；
  * 3. 有待拍符的异兽时弹出现身拍符界面（autoPlay 关闭时）；
@@ -38,7 +87,19 @@ export class Boot extends Component {
 
   start(): void {
     console.log('[Boot] 开始启动');
-    if (!this.node.getComponent(Canvas)) console.warn('[Boot] Boot 没有挂在 Canvas 节点上，界面可能显示不出来');
+    applyDesignResolution();
+    if (!this.node.getComponent(Canvas)) {
+      // 挂错了节点：挪到 Canvas 上（没有 Canvas 就建一个），界面才显示得出来
+      const canvas = ensureCanvas();
+      if (canvas && canvas.node !== this.node) {
+        console.warn('[Boot] Boot 没有挂在 Canvas 节点上，已自动挪到 Canvas');
+        const b = canvas.node.getComponent(Boot) || canvas.node.addComponent(Boot);
+        b.autoPlay = this.autoPlay;
+        b.resetSaveOnStart = this.resetSaveOnStart;
+        this.destroy();
+        return;
+      }
+    }
     let files: Record<string, unknown> | null = null;
     let skinDone = false;
     const tryBoot = () => {
@@ -159,3 +220,8 @@ function describeReward(r: RevealReward): string {
   return parts.join('\n');
 }
 
+if (!EDITOR) {
+  director.on(Director.EVENT_AFTER_SCENE_LAUNCH, autoBoot);
+  // 万一脚本加载时场景已经开始运行，补检查一次
+  if (director.getScene()) setTimeout(autoBoot, 0);
+}
