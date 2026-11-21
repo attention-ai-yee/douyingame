@@ -49,9 +49,11 @@ export class Formulas {
     return n % g.treasureEvery === 0 && n % this.idx.cfg.stages.enemy.smallBossEvery !== 0;
   }
 
-  /** 第 n 关敌方目标战力。 */
+  /** 第 n 关敌方目标战力。新手关用固定值，之后按公式。 */
   enemyPower(n: number): number {
     const e = this.idx.cfg.stages.enemy;
+    const tut = e.tutorialEnemyPower;
+    if (n >= 1 && n <= tut.length) return tut[n - 1];
     let v = this.enemyBase(n);
     if (this.isChapterBoss(n)) v *= e.chapterBossMult;
     else if (this.isSmallBoss(n)) v *= e.smallBossMult;

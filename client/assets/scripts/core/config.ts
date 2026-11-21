@@ -96,6 +96,9 @@ export function validateConfig(cfg: GameConfig): string[] {
     expect = s.to + 1;
   }
   if (expect - 1 < idx.maxStage) errs.push(`敌人增长分段只覆盖到第 ${expect - 1} 关，主线共 ${idx.maxStage} 关`);
+  const tut = cfg.stages.enemy.tutorialEnemyPower || [];
+  if (tut.length >= cfg.stages.enemy.smallBossEvery) errs.push('新手关数量应少于第一个小 Boss 关');
+  for (const v of tut) if (!(v > 0)) errs.push('新手关敌方战力必须 > 0');
   for (const c of cfg.stages.chapters) {
     if (!idx.mountain[c.mountain]) errs.push(`第 ${c.id} 章引用了不存在的山脉 ${c.mountain}`);
     if (c.boss.captureBeast && !idx.beast[c.boss.captureBeast]) errs.push(`第 ${c.id} 章 Boss 收服的异兽 ${c.boss.captureBeast} 不存在`);

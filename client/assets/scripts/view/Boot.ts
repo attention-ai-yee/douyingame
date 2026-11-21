@@ -62,6 +62,13 @@ export class Boot extends Component {
 
   private autoStep(): void {
     const core = App.core;
+    core.claimOffline(1);
+    if (core.canClaimSignin()) {
+      const r = core.idx.cfg.signin.firstRound;
+      const today = r[core.state.signin.claimedInRound % r.length];
+      core.claimSignin(today.choice ? today.choice[0] : undefined);
+    }
+    core.claimStoredWild();
     if (core.canFreeTenPull()) {
       const m = core.mountains().filter((x) => x.unlocked).pop();
       if (m) core.pull(m.id, 10);

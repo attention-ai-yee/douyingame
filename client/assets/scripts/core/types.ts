@@ -158,7 +158,8 @@ export interface StagesConfig {
     smallBossEvery: number;
     smallBossMult: number;
     chapterBossMult: number;
-    tutorialFixedStages: number;
+    /** 第 1～N 关的固定敌方战力（新手关）。 */
+    tutorialEnemyPower: number[];
   };
   rewards: { smallBossTickets: number };
   tower: {

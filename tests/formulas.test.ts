@@ -8,7 +8,10 @@ const f = new Formulas(indexConfig(loadConfig()));
 
 describe('数值公式（与游戏设计文档第 8 节、18.4 节的表一致）', () => {
   it('敌方战力', () => {
-    expect(f.enemyPower(1)).toBe(450);
+    expect(f.enemyPower(1)).toBe(60); // 新手关固定值
+    expect(f.enemyPower(3)).toBe(130);
+    expect(f.enemyBase(1)).toBe(450);
+    expect(f.enemyPower(4)).toBeCloseTo(450 * 1.14 ** 3, 6);
     expect(f.enemyPower(10)).toBeCloseTo(1756, -1);
     expect(f.enemyPower(40) / 1e4).toBeCloseTo(20.57, 0); // 文档：20.8 万
     expect(f.enemyPower(120) / 1e8).toBeCloseTo(3.5, 0);

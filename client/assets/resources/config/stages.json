@@ -1,5 +1,5 @@
 {
-  "_doc": "主线与镇妖塔。对应 游戏设计文档 第 8 节、18.4 节。敌人战力 = base × 逐关增长；Boss 系数只作用于该关。",
+  "_doc": "主线与镇妖塔。对应 游戏设计文档 第 8 节、18.4 节。敌人战力 = base × 逐关增长；Boss 系数只作用于该关。tutorialEnemyPower 为第 1～N 关的固定敌方战力（新手关，单只凡兽 1 级也能赢）。",
   "chapterLength": 40,
   "chapters": [
     { "id": 1, "mountain": "nanshan", "name": "南山经",
@@ -20,7 +20,7 @@
     "smallBossEvery": 10,
     "smallBossMult": 1.2,
     "chapterBossMult": 1.4,
-    "tutorialFixedStages": 3
+    "tutorialEnemyPower": [60, 90, 130]
   },
   "rewards": { "smallBossTickets": 3 },
   "tower": {

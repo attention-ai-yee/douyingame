@@ -118,8 +118,19 @@ describe('推图、阵位、镇妖塔', () => {
     expect(p.isBoss).toBe(true);
   });
 
+  it('新手关：只有一只 1 级的"类"也能连过第 1～3 关', () => {
+    const { core } = makeCore();
+    expect(core.challengeStage().win).toBe(true);
+    core.upgradeCheapest();
+    expect(core.challengeStage().win).toBe(true);
+    core.upgradeCheapest();
+    expect(core.challengeStage().win).toBe(true);
+    expect(core.state.stage).toBe(3);
+  });
+
   it('助战：本场战力 ×1.3，每天 5 次', () => {
     const { core } = makeCore();
+    core.state.stage = 10;
     const enemy = core.nextStage()!.enemyPower;
     const power = core.teamPower();
     core.state.slotLevels = [1, 1, 1, 1, 1];

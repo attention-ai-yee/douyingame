@@ -87,8 +87,11 @@ class Model:
         return self.enemy_cfg["segments"][-1]["growth"]
 
     def enemy(self, n):
-        v = self.enemy_base_tbl[n]
         e = self.enemy_cfg
+        tut = e.get("tutorialEnemyPower", [])
+        if 1 <= n <= len(tut):
+            return float(tut[n - 1])
+        v = self.enemy_base_tbl[n]
         if n % self.chapter_len == 0:
             v *= e["chapterBossMult"]
         elif n % e["smallBossEvery"] == 0:
