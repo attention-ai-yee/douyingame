@@ -12,10 +12,10 @@
   "enemy": {
     "base": 450,
     "segments": [
-      { "from": 2,  "to": 20,  "growth": 1.14 },
-      { "from": 21, "to": 40,  "growth": 1.18 },
-      { "from": 41, "to": 80,  "growth": 1.105 },
-      { "from": 81, "to": 120, "growth": 1.09 }
+      { "from": 2,  "to": 20,  "growth": 1.143 },
+      { "from": 21, "to": 40,  "growth": 1.183 },
+      { "from": 41, "to": 80,  "growth": 1.111 },
+      { "from": 81, "to": 120, "growth": 1.096 }
     ],
     "smallBossEvery": 10,
     "smallBossMult": 1.2,

@@ -1,10 +1,10 @@
 {
-  "_doc": "养成与金币。对应 游戏设计文档 第 7、8、9 节。",
+  "_doc": "养成、挂机宝箱、装备。对应 游戏设计文档 第 7、8、9 节。等级挂在异兽身上：升级花金币和经验，重置全额返还。挂机产出（金币、经验、寻兽符、星魄、装备）先进挂机宝箱，点宝箱领取。",
   "star": {
     "costs": [2, 4, 8, 16],
     "mults": [1.0, 1.3, 1.7, 2.2, 3.0],
     "shinyDupShards": 2,
-    "shinyStatBonus": 0.10
+    "shinyStatBonus": 0.1
   },
   "awaken": {
     "enabled": false,
@@ -14,22 +14,51 @@
     "skillBoostAtLevel": 3
   },
   "melt": { "ratio": 3 },
-  "slot": {
+  "level": {
     "costBase": 10,
     "costGrowth": 1.085,
     "statGrowth": 1.065,
-    "unlocks": [ { "stage": 0, "slots": 3 }, { "stage": 10, "slots": 4 }, { "stage": 40, "slots": 5 } ]
+    "expRatio": 0.5,
+    "_doc": "L 级升 L+1 级：金币 costBase×costGrowth^(L−1)，经验为金币的 expRatio 倍；属性 ×statGrowth^(L−1)。挂机每分钟经验也是金币的 expRatio 倍。"
   },
-  "synergyPower": { "two": 0.10, "four": 0.15 },
-  "gold": {
-    "perMinBase": 20,
-    "perMinGrowth": 1.07,
-    "firstClearMinutes": 4,
-    "treasureEvery": 5,
-    "treasureMult": 2,
+  "slots": {
+    "unlocks": [{ "stage": 0, "slots": 3 }, { "stage": 10, "slots": 4 }, { "stage": 40, "slots": 5 }]
+  },
+  "synergyPower": { "two": 0.1, "four": 0.15 },
+  "gold": { "perMinBase": 20, "perMinGrowth": 1.07, "firstClearMinutes": 4, "treasureEvery": 5, "treasureMult": 2 },
+  "chest": {
+    "capHours": 8,
     "offlineRatio": 0.6,
-    "offlineCapHours": 8,
-    "offlineMinMinutes": 1
+    "popupMinMinutes": 10,
+    "equipEveryMinutes": 15,
+    "ticketEveryHours": 3,
+    "fanShardEveryHours": 4,
+    "maxItems": 40,
+    "_doc": "宝箱最多攒 capHours 小时（在线离线都算）；离线时产出按 offlineRatio 打折。每 equipEveryMinutes 分钟（按折算后的挂机时间）掉 1 件装备，超过 maxItems 件的自动分解成金币。离开超过 popupMinMinutes 分钟，回来时自动弹出宝箱。"
+  },
+  "equip": {
+    "slots": [
+      { "name": "兽爪", "stat": "atk" },
+      { "name": "鳞甲", "stat": "hp" },
+      { "name": "灵铃", "stat": "atk" },
+      { "name": "护符", "stat": "hp" }
+    ],
+    "quality": {
+      "fan": { "pct": 0.02, "dismantleMinutes": 1 },
+      "ling": { "pct": 0.04, "dismantleMinutes": 2 },
+      "xi": { "pct": 0.07, "dismantleMinutes": 4 },
+      "chuanshuo": { "pct": 0.12, "dismantleMinutes": 8 }
+    },
+    "tierStages": 40,
+    "tierStep": 0.5,
+    "bagCap": 100,
+    "dropWeights": [
+      { "fromStage": 0, "weights": { "fan": 72, "ling": 24, "xi": 4, "chuanshuo": 0 }},
+      { "fromStage": 40, "weights": { "fan": 45, "ling": 37, "xi": 15, "chuanshuo": 3 }},
+      { "fromStage": 80, "weights": { "fan": 25, "ling": 42, "xi": 26, "chuanshuo": 7 }}
+    ],
+    "firstClear": { "smallBoss": "ling", "chapterBoss": "xi" },
+    "_doc": "每件装备给一项属性百分比加成：pct × (1 + tierStep × (阶 − 1))，阶 = ⌈挂机等效关卡 / tierStages⌉。单只异兽装备系数 = √((1+攻击加成)(1+生命加成))。小 Boss / 章节 Boss 首通必掉不低于对应品质的装备。"
   },
   "assist": { "powerMult": 1.3, "dailyCap": 5 },
   "wild": { "stageClearChance": 0.15, "idleEveryHours": 2, "idleStoreCap": 3, "dailyCap": 5 },

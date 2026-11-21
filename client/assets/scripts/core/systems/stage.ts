@@ -1,6 +1,8 @@
+import { Item } from '../state';
 import { Rarity } from '../types';
 import { Ctx } from './context';
-import { idleGoldPerMin } from './idle';
+import { addToBag, newItem } from './equip';
+import { idleExpPerMin, idleGoldPerMin } from './idle';
 import { teamPower } from './progression';
 
 export interface StageInfo {
@@ -14,7 +16,10 @@ export interface StageInfo {
 
 export interface StageReward {
   gold: number;
+  exp: number;
   tickets: number;
+  /** Boss 首通必掉的装备（已放进背包），没有为 null。 */
+  item: Item | null;
   /** 章节 Boss 收服的异兽（需要走现身拍符），没有为 null。 */
   captureBeast: string | null;
   /** 这次通关新开放的阵位数（没有变化为 0）。 */
@@ -25,6 +30,7 @@ export interface StageReward {
 
 export interface FloorReward {
   gold: number;
+  exp: number;
   tickets: number;
   wild: Partial<Record<Rarity, number>>;
 }
@@ -57,23 +63,32 @@ export function completeStage(ctx: Ctx): StageReward | null {
   const prevSlots = ctx.f.slotsAt(ctx.s.stage);
   ctx.s.stage = info.stage;
   const g = ctx.idx.cfg.progression.gold;
-  let gold = g.firstClearMinutes * idleGoldPerMin(ctx);
-  if (info.isTreasure) gold *= g.treasureMult;
+  const mins = g.firstClearMinutes * (info.isTreasure ? g.treasureMult : 1);
+  const gold = mins * idleGoldPerMin(ctx);
+  const exp = mins * idleExpPerMin(ctx);
   let tickets = 0;
   let captureBeast: string | null = null;
+  let item: Item | null = null;
+  const fc = ctx.idx.cfg.progression.equip.firstClear;
   if (info.isChapterBoss) {
     const ch = ctx.idx.chapter[info.chapter];
     tickets += ch.boss.rewardTickets;
     captureBeast = ch.boss.captureBeast;
+    item = newItem(ctx, { minQ: fc.chapterBoss, eqStage: info.stage });
   } else if (info.isSmallBoss) {
     tickets += ctx.idx.cfg.stages.rewards.smallBossTickets;
+    item = newItem(ctx, { minQ: fc.smallBoss, eqStage: info.stage });
   }
   ctx.s.gold += gold;
+  ctx.s.exp += exp;
   ctx.s.tickets += tickets;
+  if (item) addToBag(ctx, [item]);
   const nowSlots = ctx.f.slotsAt(ctx.s.stage);
   return {
     gold,
+    exp,
     tickets,
+    item,
     captureBeast,
     slotsUnlockedTo: nowSlots > prevSlots ? nowSlots : 0,
     wildRoll: ctx.rng.chance(ctx.idx.cfg.progression.wild.stageClearChance),
@@ -99,15 +114,18 @@ export function completeFloor(ctx: Ctx): FloorReward | null {
   if (!towerUnlocked(ctx)) return null;
   const f = ++ctx.s.floor;
   const rw = ctx.idx.cfg.stages.tower.rewards;
-  const gold = ctx.idx.cfg.progression.gold.firstClearMinutes * idleGoldPerMin(ctx);
+  const mins = ctx.idx.cfg.progression.gold.firstClearMinutes;
+  const gold = mins * idleGoldPerMin(ctx);
+  const exp = mins * idleExpPerMin(ctx);
   const tickets = f % rw.ticketsEvery === 0 ? rw.tickets : 0;
   const wild: Partial<Record<Rarity, number>> = {};
   if (f % rw.lingWildEvery === 0) wild.ling = 1;
   if (f % rw.xiWildEvery === 0) wild.xi = (wild.xi || 0) + 1;
   ctx.s.gold += gold;
+  ctx.s.exp += exp;
   ctx.s.tickets += tickets;
   for (const k in wild) ctx.s.wildShards[k as Rarity] += wild[k as Rarity] as number;
-  return { gold, tickets, wild };
+  return { gold, exp, tickets, wild };
 }
 
 export function canUseAssist(ctx: Ctx): boolean {

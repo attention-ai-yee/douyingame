@@ -4,8 +4,8 @@
   "interstitialAdUnitId": "",
   "noFillRewardRatio": 0.5,
   "rewarded": {
-    "offline_double":       { "name": "离线收益翻倍",   "dailyCap": null, "since": "mvp0" },
-    "tickets":              { "name": "看视频得进山符", "dailyCap": 4,    "since": "mvp0", "tickets": 5 },
+    "offline_double":       { "name": "挂机宝箱翻倍",   "dailyCap": null, "since": "mvp0" },
+    "tickets":              { "name": "看视频得寻兽符", "dailyCap": 4,    "since": "mvp0", "tickets": 5 },
     "assist":               { "name": "召唤助战",       "dailyCap": 5,    "since": "mvp0" },
     "reveal_retry":         { "name": "再拍一轮",       "dailyCap": 3,    "since": "mvp1" },
     "boss_capture_double":  { "name": "收服奖励翻倍",   "dailyCap": null, "since": "mvp1" },

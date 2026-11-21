@@ -34,13 +34,14 @@ export interface SigninResult {
   /** 获得的异兽（自选或指定），GameCore 负责入库和现身拍符。 */
   beastId: string | null;
   goldGained: number;
+  expGained: number;
 }
 
 /**
  * 领取今天的签到。自选奖励需要传入 choice（必须在可选列表里）。
  * 只发放货币类奖励；异兽由 GameCore 统一入库。
  */
-export function claimSignin(ctx: Ctx, goldPerMin: number, choice?: string): SigninResult | null {
+export function claimSignin(ctx: Ctx, goldPerMin: number, expPerMin: number, choice?: string): SigninResult | null {
   if (!canClaimSignin(ctx)) return null;
   const reward = currentSigninReward(ctx);
   let beastId: string | null = reward.beast || null;
@@ -51,7 +52,9 @@ export function claimSignin(ctx: Ctx, goldPerMin: number, choice?: string): Sign
   if (reward.tickets) ctx.s.tickets += reward.tickets;
   if (reward.wild) for (const k in reward.wild) ctx.s.wildShards[k as Rarity] += reward.wild[k as Rarity] as number;
   const goldGained = reward.goldMinutes ? reward.goldMinutes * goldPerMin : 0;
+  const expGained = reward.goldMinutes ? reward.goldMinutes * expPerMin : 0;
   ctx.s.gold += goldGained;
+  ctx.s.exp += expGained;
 
   const cfg = ctx.idx.cfg.signin;
   const roundLen = (ctx.s.signin.round === 0 ? cfg.firstRound : cfg.laterRounds).length;
@@ -61,5 +64,5 @@ export function claimSignin(ctx: Ctx, goldPerMin: number, choice?: string): Sign
     ctx.s.signin.claimedInRound = 0;
   }
   ctx.s.signin.lastClaimDayKey = dayKeyOf(ctx.now);
-  return { reward, beastId, goldGained };
+  return { reward, beastId, goldGained, expGained };
 }

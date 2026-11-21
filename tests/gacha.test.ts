@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rarityAtLeast } from '../client/assets/scripts/core';
+import { newBeastState, rarityAtLeast } from '../client/assets/scripts/core';
 import { addBeast } from '../client/assets/scripts/core/systems/collection';
 import { makeCore } from './helpers';
 
@@ -102,7 +102,7 @@ describe('进山抽兽', () => {
     expect(core.melt('lei', 4)).toBe(0); // 必须是 3 的倍数
     expect(core.melt('lei', 6)).toBe(2);
     expect(core.state.wildShards.ling).toBe(2);
-    core.state.beasts.yinglong = { star: 5, shards: 9, awaken: 0, shiny: false, obtainedAt: 0 };
+    core.state.beasts.yinglong = newBeastState(0, { star: 5, shards: 9 });
     expect(core.melt('yinglong', 9)).toBe(0);
   });
 });

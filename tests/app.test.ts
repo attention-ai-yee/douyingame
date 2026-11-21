@@ -53,7 +53,7 @@ describe('App 启动、存档、前后台', () => {
     clock.advance(3 * HOUR);
     App.boot(files(), p); // 模拟冷启动
     expect(App.core.state.gold).toBeGreaterThanOrEqual(999);
-    expect(App.core.state.pendingOffline).not.toBeNull();
+    expect(App.core.state.chest.ms).toBe(3 * HOUR); // 离线 3 小时攒进了宝箱
   });
 
   it('自动存档：每 60 秒一次', () => {

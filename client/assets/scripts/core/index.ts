@@ -10,4 +10,5 @@ export * from './reveal/RevealSession';
 export { dayKeyOf } from './systems/daily';
 export type { PullResult } from './systems/gacha';
 export type { StageInfo, StageReward, FloorReward } from './systems/stage';
-export type { OfflineResult } from './systems/idle';
+export type { OfflineResult, ChestClaim } from './systems/idle';
+export type { LevelCost, ResetResult } from './systems/progression';

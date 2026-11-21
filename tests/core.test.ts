@@ -1,52 +1,69 @@
 import { describe, expect, it } from 'vitest';
-import { GameCore, migrate, SAVE_VERSION } from '../client/assets/scripts/core';
+import { GameCore, migrate, newBeastState, SAVE_VERSION } from '../client/assets/scripts/core';
 import { DAY, HOUR, loadConfig, makeCore, MIN } from './helpers';
 
-describe('挂机与离线', () => {
-  it('在线时按真实时间累计金币', () => {
+describe('挂机宝箱', () => {
+  it('在线挂机：产出先进宝箱，点领取才到手；经验是金币的一半', () => {
     const { core, clock } = makeCore();
     core.resume();
     for (let i = 0; i < 60; i++) {
       clock.advance(1000);
       core.tick();
     }
-    expect(core.state.gold).toBeCloseTo(core.goldPerMin(), 6); // 1 分钟
+    expect(core.state.gold).toBe(0);
+    expect(core.state.chest.gold).toBeCloseTo(core.goldPerMin(), 6); // 1 分钟
+    expect(core.state.chest.exp).toBeCloseTo(core.goldPerMin() * 0.5, 6);
+    const got = core.claimChest();
+    expect(core.state.gold).toBeCloseTo(got.gold, 6);
+    expect(core.state.exp).toBeCloseTo(got.exp, 6);
+    expect(core.chestEmpty()).toBe(true);
   });
 
-  it('离线收益 = 60% × 挂机效率，上限 8 小时，看广告可翻倍', () => {
+  it('离线按 60% 攒进宝箱，最多 8 小时；看广告金币经验翻倍', () => {
     const { core, clock } = makeCore();
     core.resume();
     core.pause();
     clock.advance(10 * HOUR);
     const res = core.resume();
     expect(res.ms).toBe(8 * HOUR);
-    expect(res.gold).toBeCloseTo(core.goldPerMin() * 8 * 60 * 0.6, 6);
-    expect(core.state.pendingOffline).not.toBeNull();
-    const got = core.claimOffline(2);
-    expect(got).toBeCloseTo(res.gold * 2, 6);
-    expect(core.state.pendingOffline).toBeNull();
+    expect(core.chestFull()).toBe(true);
+    const gold = core.goldPerMin() * 8 * 60 * 0.6;
+    expect(core.state.chest.gold).toBeCloseTo(gold, 6);
+    // 装备每 15 分钟（折算后）1 件，寻兽符每 3 小时 1 张，凡级万能星魄每 4 小时 1 个
+    expect(core.state.chest.items.length).toBe(Math.floor((8 * 60 * 0.6) / 15));
+    expect(core.state.chest.tickets).toBe(1);
+    expect(core.state.chest.fanShards).toBe(1);
+    const got = core.claimChest(2);
+    expect(got.gold).toBeCloseTo(gold * 2, 6);
+    expect(core.state.bag.length).toBe(got.items.length);
+    expect(core.state.tickets).toBe(1);
+    expect(core.state.wildShards.fan).toBe(1);
   });
 
-  it('离开不到 1 分钟：直接按在线入账，不弹离线收益', () => {
+  it('宝箱满了不再增加，领取后重新开始攒', () => {
     const { core, clock } = makeCore();
     core.resume();
     core.pause();
-    clock.advance(30 * 1000);
-    const before = core.state.gold;
-    const res = core.resume();
-    expect(res.gold).toBe(0);
-    expect(core.state.pendingOffline).toBeNull();
-    expect(core.state.gold).toBeCloseTo(before + core.goldPerMin() / 2, 6);
+    clock.advance(9 * HOUR);
+    core.resume();
+    const full = core.state.chest.gold;
+    clock.advance(60 * 1000);
+    core.tick();
+    expect(core.state.chest.gold).toBe(full);
+    core.claimChest();
+    clock.advance(60 * 1000);
+    core.tick();
+    expect(core.state.chest.gold).toBeCloseTo(core.goldPerMin(), 6);
   });
 
-  it('系统时间被往回调时，离线收益为 0', () => {
+  it('系统时间被往回调时，宝箱不增加', () => {
     const { core, clock } = makeCore();
     core.resume();
     core.pause();
     clock.advance(-3 * HOUR);
     const res = core.resume();
     expect(res.clockRollback).toBe(true);
-    expect(res.gold).toBe(0);
+    expect(core.state.chest.gold).toBe(0);
   });
 
   it('离线每 2 小时累积 1 次野遇，最多 3 次；领取时受每日 5 次上限约束', () => {
@@ -73,39 +90,118 @@ describe('挂机与离线', () => {
   });
 });
 
-describe('推图、阵位、镇妖塔', () => {
-  it('升级阵位后能推过前几关，首通给金币', () => {
+describe('异兽升级与装备', () => {
+  it('升级花金币和经验，经验不够就升不了', () => {
+    const { core } = makeCore();
+    core.state.gold = 1000;
+    core.state.exp = 0;
+    expect(core.levelUp('lei')).toBe(0);
+    core.state.exp = 5;
+    expect(core.levelUp('lei')).toBe(1);
+    expect(core.state.beasts.lei.level).toBe(2);
+    expect(core.state.gold).toBe(990);
+    expect(core.state.exp).toBe(0);
+  });
+
+  it('一键升级轮流给上阵异兽里等级最低的升级', () => {
+    const { core } = makeCore();
+    core.state.beasts.lushu = newBeastState(0);
+    core.state.beasts.huahuai = newBeastState(0, { level: 5 });
+    core.state.team = ['lei', 'lushu', 'huahuai', null, null];
+    core.state.gold = 25;
+    core.state.exp = 1000;
+    core.upgradeTeam();
+    expect(['lei', 'lushu', 'huahuai'].map((id) => core.state.beasts[id].level)).toEqual([2, 2, 5]);
+  });
+
+  it('重置：回到 1 级，金币和经验全额返还，装备卸到背包', () => {
+    const { core } = makeCore();
+    core.state.gold = 1e6;
+    core.state.exp = 1e6;
+    core.levelUp('lei', 30);
+    core.state.bag.push({ id: 99, slot: 0, q: 'xi', tier: 1 });
+    core.equip('lei', 99);
+    const r = core.resetBeast('lei')!;
+    expect(core.state.beasts.lei.level).toBe(1);
+    expect(core.state.gold).toBeCloseTo(1e6, 4);
+    expect(core.state.exp).toBeCloseTo(1e6, 4);
+    expect(r.items).toBe(1);
+    expect(core.state.bag.map((x) => x.id)).toEqual([99]);
+  });
+
+  it('装备加战力：一键穿戴挑更好的，旧的回背包；一键分解只留稀有以上', () => {
+    const { core } = makeCore();
+    const p0 = core.unitPower('lei');
+    core.state.bag.push({ id: 1, slot: 0, q: 'fan', tier: 1 }, { id: 2, slot: 0, q: 'ling', tier: 1 }, { id: 3, slot: 1, q: 'xi', tier: 1 });
+    expect(core.hasEquipUpgrade()).toBe(true);
+    expect(core.equipBest()).toBe(2);
+    expect(core.state.beasts.lei.equip[0]!.id).toBe(2);
+    expect(core.state.beasts.lei.equip[1]!.id).toBe(3);
+    expect(core.unitPower('lei')).toBeCloseTo(p0 * Math.sqrt(1.04 * 1.07), 6);
+    expect(core.state.bag.map((x) => x.id)).toEqual([1]);
+    const d = core.dismantleBag('xi');
+    expect(d.count).toBe(1);
+    expect(d.gold).toBeGreaterThan(0);
+    expect(core.state.bag.length).toBe(0);
+  });
+
+  it('装备的阶随进度提高，数值按阶增长', () => {
+    const { core } = makeCore();
+    expect(core.f.itemTier(40)).toBe(1);
+    expect(core.f.itemTier(41)).toBe(2);
+    expect(core.f.itemPct('chuanshuo', 3)).toBeCloseTo(0.12 * 2, 9);
+  });
+});
+
+describe('闯关、阵位、镇妖塔', () => {
+  it('挂机不会自己推关：只有主动挑战才会过关', () => {
+    const { core, clock } = makeCore();
+    core.resume();
+    for (let i = 0; i < 600; i++) {
+      clock.advance(1000);
+      core.tick();
+    }
+    expect(core.state.stage).toBe(0);
+  });
+
+  it('升级后能闯过前几关，首通给金币和经验', () => {
     const { core } = makeCore();
     core.state.gold = 5000;
-    core.upgradeCheapest();
+    core.state.exp = 5000;
+    core.upgradeTeam();
+    core.state.gold = 0;
+    core.state.exp = 0;
     let wins = 0;
     for (let i = 0; i < 5; i++) if (core.challengeStage().win) wins++;
     expect(wins).toBeGreaterThan(0);
     expect(core.state.stage).toBe(wins);
+    expect(core.state.gold).toBeGreaterThan(0);
+    expect(core.state.exp).toBeCloseTo(core.state.gold * 0.5, 6);
+  });
+
+  it('小 Boss 首通必掉灵级以上装备', () => {
+    const { core } = makeCore();
+    core.state.stage = 9;
+    core.state.beasts.lei.level = 200;
+    const r = core.challengeStage();
+    expect(r.win).toBe(true);
+    expect(core.state.bag.length).toBe(1);
+    expect(['ling', 'xi', 'chuanshuo']).toContain(core.state.bag[0].q);
   });
 
   it('空阵位自动补上新异兽，已上阵的不动', () => {
     const { core } = makeCore();
-    core.state.beasts.jiuweihu = { star: 1, shards: 0, awaken: 0, shiny: false, obtainedAt: 0 };
-    core.state.beasts.lushu = { star: 1, shards: 0, awaken: 0, shiny: false, obtainedAt: 0 };
+    core.state.beasts.jiuweihu = newBeastState(0);
+    core.state.beasts.lushu = newBeastState(0);
     expect(core.fillEmptySlots()).toBe(2);
     expect(core.state.team.slice(0, 3)).toEqual(['lei', 'jiuweihu', 'lushu']);
     expect(core.fillEmptySlots()).toBe(0);
   });
 
-  it('一键升级优先升最便宜的阵位', () => {
-    const { core } = makeCore();
-    core.state.slotLevels = [5, 1, 1, 1, 1];
-    core.state.gold = 25;
-    core.upgradeCheapest();
-    expect(core.state.slotLevels.slice(0, 3)).toEqual([5, 2, 2]);
-  });
-
   it('第 10 关开第 4 阵位；第 40 关开第 5 阵位并解锁镇妖塔', () => {
     const { core } = makeCore();
     core.state.stage = 9;
-    core.state.gold = 1e9;
-    core.upgradeCheapest();
+    core.state.beasts.lei.level = 200;
     core.autoTeam();
     expect(core.challengeStage().win).toBe(true);
     expect(core.slotsAvailable()).toBe(4);
@@ -120,8 +216,7 @@ describe('推图、阵位、镇妖塔', () => {
   it('镇妖塔每 5 层给进山符、每 10 层给灵级万能星魄', () => {
     const { core } = makeCore();
     core.state.stage = 40;
-    core.state.gold = 1e12;
-    core.upgradeCheapest();
+    core.state.beasts.lei.level = 400;
     for (let i = 0; i < 10; i++) expect(core.challengeFloor().win).toBe(true);
     expect(core.state.floor).toBe(10);
     expect(core.state.tickets).toBe(4);
@@ -131,8 +226,7 @@ describe('推图、阵位、镇妖塔', () => {
   it('第 2 章 Boss 陆吾首次击败必定收服，并进入 Boss 拍符', () => {
     const { core } = makeCore();
     core.state.stage = 79;
-    core.state.gold = 1e15;
-    core.upgradeCheapest();
+    core.state.beasts.lei.level = 600;
     expect(core.challengeStage().win).toBe(true);
     expect(core.state.beasts.luwu).toBeDefined();
     const p = core.revealQueue.find((r) => r.beastId === 'luwu')!;
@@ -142,9 +236,9 @@ describe('推图、阵位、镇妖塔', () => {
   it('新手关：只有一只 1 级的"类"也能连过第 1～3 关', () => {
     const { core } = makeCore();
     expect(core.challengeStage().win).toBe(true);
-    core.upgradeCheapest();
+    core.upgradeTeam();
     expect(core.challengeStage().win).toBe(true);
-    core.upgradeCheapest();
+    core.upgradeTeam();
     expect(core.challengeStage().win).toBe(true);
     expect(core.state.stage).toBe(3);
   });
@@ -154,7 +248,6 @@ describe('推图、阵位、镇妖塔', () => {
     core.state.stage = 10;
     const enemy = core.nextStage()!.enemyPower;
     const power = core.teamPower();
-    core.state.slotLevels = [1, 1, 1, 1, 1];
     expect(power).toBeLessThan(enemy);
     for (let i = 0; i < 5; i++) core.challengeStage(true);
     expect(core.state.daily.assistsUsed).toBe(5);
@@ -196,13 +289,38 @@ describe('存档', () => {
 
   it('旧存档缺字段时用默认值补齐；更新版本的存档不读', () => {
     const now = Date.now();
-    const s = migrate({ v: 1, gold: 7, beasts: { lei: { star: 2, shards: 1, awaken: 0, shiny: false, obtainedAt: 0 } } }, now, 1)!;
+    const s = migrate({ v: 2, gold: 7, beasts: { lei: { star: 2, shards: 1, awaken: 0, shiny: false, obtainedAt: 0 } } }, now, 1)!;
     expect(s.gold).toBe(7);
-    expect(s.slotLevels).toEqual([1, 1, 1, 1, 1]);
+    expect(s.exp).toBe(0);
     expect(s.daily.freeTenPullsUsed).toBe(0);
     expect(s.beasts.lei.star).toBe(2);
+    expect(s.beasts.lei.level).toBe(1);
+    expect(s.beasts.lei.equip).toEqual([null, null, null, null]);
     expect(migrate({ v: SAVE_VERSION + 1 }, now, 1)).toBeNull();
     expect(GameCore.loadState('{坏掉的存档', now, 1).v).toBe(SAVE_VERSION);
+  });
+});
+
+describe('存档升级 v1 → v2', () => {
+  it('阵位等级挪到所在阵位的异兽身上，离线收益并进宝箱', () => {
+    const v1 = {
+      v: 1,
+      gold: 5,
+      team: ['lei', 'lushu', null, null, null],
+      slotLevels: [12, 7, 3, 1, 1],
+      beasts: {
+        lei: { star: 1, shards: 0, awaken: 0, shiny: false, obtainedAt: 0 },
+        lushu: { star: 1, shards: 0, awaken: 0, shiny: false, obtainedAt: 0 },
+        huan: { star: 1, shards: 0, awaken: 0, shiny: false, obtainedAt: 0 },
+      },
+      pendingOffline: { ms: 3600e3, gold: 500 },
+    };
+    const s = migrate(v1, Date.now(), 1)!;
+    expect(s.v).toBe(SAVE_VERSION);
+    expect([s.beasts.lei.level, s.beasts.lushu.level, s.beasts.huan.level]).toEqual([12, 7, 1]);
+    expect(s.chest.gold).toBe(500);
+    expect('slotLevels' in s).toBe(false);
+    expect('pendingOffline' in s).toBe(false);
   });
 });
 
@@ -214,7 +332,7 @@ describe('冒烟：用 GameCore 玩 3 天', () => {
     for (let day = 1; day <= 3; day++) {
       for (const sessionMin of [6, 8, 12, 6]) {
         core.resume();
-        core.claimOffline(1);
+        core.claimChest(1);
         core.claimStoredWild();
         if (core.canClaimSignin()) core.claimSignin(core.idx.cfg.signin.firstRound[2].choice![0]);
         const mtn = core.mountains().filter((m) => m.unlocked).pop()!;
@@ -226,7 +344,9 @@ describe('冒烟：用 GameCore 玩 3 天', () => {
         for (let m = 0; m < sessionMin; m++) {
           clock.advance(MIN);
           core.tick();
-          core.upgradeCheapest();
+          core.claimChest(1);
+          core.equipBest();
+          core.upgradeTeam();
           while (core.challengeStage().win);
           if (core.towerUnlocked()) while (core.challengeFloor().win);
         }

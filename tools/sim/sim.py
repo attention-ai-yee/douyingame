@@ -2,7 +2,9 @@
 """《御兽山海》数值模拟器。
 
 读取 client/assets/resources/config/*.json（和游戏用的是同一份配置），
-模拟"看广告型"和"不看广告型"两类玩家每天的推图、抽兽、升星、觉醒、镇妖塔进度。
+模拟"看广告型"和"不看广告型"两类玩家每天的闯关、寻兽、升级、装备、升星、觉醒、镇妖塔进度。
+v0.6 起：等级挂在异兽身上（玩家换阵时会重置旧兽、全额返还，所以这里仍按"前 N 强的位置"记等级）；
+挂机产出进宝箱（金币、经验、装备、寻兽符、凡级万能星魄）；装备每个部位只保留前 N 强的 N 件，其余分解。
 
 用法：
     python3 tools/sim/sim.py                     # 默认 120 天、每类玩家 12 次取中位数
@@ -47,9 +49,13 @@ class Model:
         self.star_mults = prog["star"]["mults"]
         self.awk_costs = prog["awaken"]["shardCosts"]
         self.awk_mults = prog["awaken"]["mults"]
-        slot = prog["slot"]
-        self.slot_cost_base, self.slot_cost_growth, self.slot_stat_growth = slot["costBase"], slot["costGrowth"], slot["statGrowth"]
-        self.slot_unlocks = sorted(slot["unlocks"], key=lambda u: u["stage"])
+        lvl = prog["level"]
+        self.lv_cost_base, self.lv_cost_growth, self.lv_stat_growth = lvl["costBase"], lvl["costGrowth"], lvl["statGrowth"]
+        self.exp_ratio = lvl["expRatio"]
+        self.slot_unlocks = sorted(prog["slots"]["unlocks"], key=lambda u: u["stage"])
+        self.chest = prog["chest"]
+        self.equip = prog["equip"]
+        self.equip_stats = [s["stat"] for s in self.equip["slots"]]
         self.syn_two, self.syn_four = prog["synergyPower"]["two"], prog["synergyPower"]["four"]
         g = prog["gold"]
         self.gold = g
@@ -124,11 +130,25 @@ class Model:
         g = self.gold
         return g["perMinBase"] * g["perMinGrowth"] ** (max(1.0, eq_stage) - 1)
 
-    def slot_mult(self, lv):
-        return self.slot_stat_growth ** (lv - 1)
+    def level_mult(self, lv):
+        return self.lv_stat_growth ** (lv - 1)
 
-    def slot_cost(self, lv):
-        return self.slot_cost_base * self.slot_cost_growth ** (lv - 1)
+    def level_cost(self, lv):
+        return self.lv_cost_base * self.lv_cost_growth ** (lv - 1)
+
+    def item_tier(self, eq_stage):
+        return max(1, math.ceil(eq_stage / self.equip["tierStages"]))
+
+    def item_pct(self, q, tier):
+        e = self.equip
+        return e["quality"][q]["pct"] * (1 + e["tierStep"] * (tier - 1))
+
+    def drop_weights(self, eq_stage):
+        w = self.equip["dropWeights"][0]["weights"]
+        for d in self.equip["dropWeights"]:
+            if eq_stage >= d["fromStage"]:
+                w = d["weights"]
+        return w
 
     def slots(self, stage):
         k = 0
@@ -149,6 +169,10 @@ class Player:
         self.wild_shards = {"fan": 0, "ling": 0, "xi": 0, "chuanshuo": 0}
         self.lv = [1] * 5
         self.gold = 0.0
+        self.exp = 0.0
+        # 每个装备部位的前 5 强加成（第 i 强给第 i 强的异兽）
+        self.gear = [[0.0] * 5 for _ in range(len(model.equip_stats))]
+        self.clock_equip = self.clock_ticket = self.clock_shard = 0.0  # 折算后的挂机分钟
         self.stage = self.floor = 0
         self.pr = self.pl = 0
         self.day = 1
@@ -211,7 +235,54 @@ class Player:
             c = els.count(e)
             syn += (m.syn_two if c >= 2 else 0) + (m.syn_four if c >= 4 else 0)
         vals = sorted((self.unit(b) for b in bs), reverse=True)
-        return sum(v * m.slot_mult(self.lv[i]) for i, v in enumerate(vals)) * syn
+        return sum(v * m.level_mult(self.lv[i]) * self.gear_mult(i) for i, v in enumerate(vals)) * syn
+
+    # ---------- 装备 ----------
+    def gear_mult(self, i):
+        atk = sum(self.gear[s][i] for s, st in enumerate(self.m.equip_stats) if st == "atk")
+        hp = sum(self.gear[s][i] for s, st in enumerate(self.m.equip_stats) if st == "hp")
+        return math.sqrt((1 + atk) * (1 + hp))
+
+    def gain_item(self, min_q=None, eq_stage=None):
+        m = self.m
+        eq = self.eq_stage() if eq_stage is None else eq_stage
+        w = m.drop_weights(eq)
+        x = self.rng.random() * sum(w.values())
+        q = "fan"
+        for q in ("fan", "ling", "xi", "chuanshuo"):
+            x -= w[q]
+            if x < 0:
+                break
+        order = ("fan", "ling", "xi", "chuanshuo")
+        if min_q and order.index(q) < order.index(min_q):
+            q = min_q
+        v = m.item_pct(q, m.item_tier(eq))
+        s = self.rng.randrange(len(m.equip_stats))
+        g = self.gear[s]
+        if v > g[-1]:
+            g[-1] = v
+            g.sort(reverse=True)
+        else:  # 用不上的分解成金币
+            self.gold += m.equip["quality"][q]["dismantleMinutes"] * self.idle()
+
+    def idle_drops(self, eff_minutes):
+        """挂机掉落：装备、寻兽符、凡级万能星魄（按折算后的挂机分钟）。"""
+        if not self.extras:
+            return
+        c = self.m.chest
+        self.clock_equip += eff_minutes
+        while self.clock_equip >= c["equipEveryMinutes"]:
+            self.clock_equip -= c["equipEveryMinutes"]
+            self.gain_item()
+        self.clock_ticket += eff_minutes
+        while self.clock_ticket >= c["ticketEveryHours"] * 60:
+            self.clock_ticket -= c["ticketEveryHours"] * 60
+            self.pull(1)
+        self.clock_shard += eff_minutes
+        while self.clock_shard >= c["fanShardEveryHours"] * 60:
+            self.clock_shard -= c["fanShardEveryHours"] * 60
+            self.wild_shards["fan"] += 1
+            self.starup()
 
     # ---------- 抽兽（玩家总在最新解锁的山抽） ----------
     def pull(self, k):
@@ -259,15 +330,22 @@ class Player:
     def idle(self):
         return self.m.gold_per_min(self.eq_stage())
 
+    def earn(self, minutes_of_idle):
+        """获得 minutes_of_idle 分钟挂机量的金币和经验（首通、签到、宝箱都按这个给）。"""
+        g = self.idle() * minutes_of_idle
+        self.gold += g
+        self.exp += g * self.m.exp_ratio
+
     def spend(self):
         m = self.m
-        k = m.slots(self.stage)
-        while True:
+        k = min(m.slots(self.stage), len(self.own))
+        while k:
             i = min(range(k), key=lambda j: self.lv[j])
-            c = m.slot_cost(self.lv[i])
-            if self.gold < c:
+            c = m.level_cost(self.lv[i])
+            if self.gold < c or self.exp < c * m.exp_ratio:
                 break
             self.gold -= c
+            self.exp -= c * m.exp_ratio
             self.lv[i] += 1
 
     # ---------- 推进 ----------
@@ -294,10 +372,16 @@ class Player:
         while self.stage < m.max_stage and self.try_clear(m.enemy(self.stage + 1), (self.stage + 1) % e["smallBossEvery"] == 0):
             self.stage += 1
             n = self.stage
-            first = g["firstClearMinutes"] * self.idle()
+            first = g["firstClearMinutes"]
             if self.extras and n % g["treasureEvery"] == 0 and n % e["smallBossEvery"] != 0:
                 first *= g["treasureMult"]
-            self.gold += first
+            self.earn(first)
+            if self.extras:
+                fc = m.equip["firstClear"]
+                if n % m.chapter_len == 0:
+                    self.gain_item(fc["chapterBoss"], n)
+                elif n % e["smallBossEvery"] == 0:
+                    self.gain_item(fc["smallBoss"], n)
             self.spend()
             if self.rng.random() < m.wild["stageClearChance"]:
                 self.wild_encounter()
@@ -324,7 +408,7 @@ class Player:
                 if f % rw["xiWildEvery"] == 0:
                     self.wild_shards["xi"] += 1
                 self.starup()
-                self.gold += m.gold["firstClearMinutes"] * self.idle()
+                self.earn(m.gold["firstClearMinutes"])
                 self.spend()
                 if f > 20000:
                     break
@@ -344,19 +428,23 @@ class Player:
             self.wild_encounter()
 
     def online(self, minutes):
-        for _ in range(minutes):
-            self.gold += self.idle()
+        # 在线时宝箱随攒随领（不看广告翻倍）
+        for _ in range(int(minutes)):
+            self.earn(1)
+            self.idle_drops(1)
             self.spend()
             self.push()
         self.tick_wild_clock(minutes / 60)
 
     def offline(self, hours, first_of_day):
-        g = self.m.gold
-        gold = self.idle() * 60 * min(g["offlineCapHours"], hours) * g["offlineRatio"]
+        c = self.m.chest
+        eff = 60 * min(c["capHours"], hours) * c["offlineRatio"]
+        mult = 1
         if self.ad:
-            gold *= 3 if first_of_day else 2
+            mult = 3 if first_of_day else 2
             self.ads += 1
-        self.gold += gold
+        self.earn(eff * mult)
+        self.idle_drops(eff)
         self.spend()
         self.tick_wild_clock(hours)
         self.push()
@@ -375,7 +463,7 @@ def apply_signin(p, day):
     for r, n in item.get("wild", {}).items():
         p.wild_shards[r] += n
     if p.extras and item.get("goldMinutes"):
-        p.gold += item["goldMinutes"] * p.idle()
+        p.earn(item["goldMinutes"])
     p.starup()
     return tickets
 
@@ -415,14 +503,15 @@ def run(model, scen, ptype_name, days, seed, tower=True, awaken_from_day=None, e
         v = list(p.own.values())
         out[day] = dict(stage=p.stage, floor=p.floor, uniq=len(v), star=sum(v) / len(v),
                         s5=sum(x == 5 for x in v), awk=sum(p.awk.values()) / len(v),
-                        lv=p.lv[0], ads=p.ads / day)
+                        lv=p.lv[0], ads=p.ads / day, gear=p.gear_mult(0))
     return out
 
 
 def report(model, scen, days, seeds, tower, awaken_from_day, extras):
     show = [d for d in (1, 2, 3, 5, 7, 10, 14, 21, 30, 40, 60, 90, 120, 150, 180) if d <= days]
     rows = (("stage", "主线关卡", "{:>6.0f}"), ("floor", "镇妖塔层", "{:>6.0f}"), ("uniq", "图鉴数", "{:>6.0f}"),
-            ("star", "平均星级", "{:>6.1f}"), ("s5", "5星只数", "{:>6.0f}"), ("awk", "觉醒均阶", "{:>6.1f}"))
+            ("star", "平均星级", "{:>6.1f}"), ("s5", "5星只数", "{:>6.0f}"), ("awk", "觉醒均阶", "{:>6.1f}"),
+            ("lv", "最高等级", "{:>6.0f}"), ("gear", "装备系数", "{:>6.2f}"))
     for name in scen["players"]:
         res = [run(model, scen, name, days, s, tower, awaken_from_day, extras) for s in range(seeds)]
 
@@ -454,7 +543,7 @@ def main():
     ap.add_argument("--seeds", type=int, default=None, help="每类玩家模拟次数（默认取 scenarios.json）")
     ap.add_argument("--no-tower", action="store_true", help="不开镇妖塔")
     ap.add_argument("--awaken-day", type=int, default=None, help="第几天开放觉醒（默认取 scenarios.json，-1 表示不开）")
-    ap.add_argument("--legacy", action="store_true", help="复现文档 v0.4 的口径：不算宝箱关、Boss 奖励、挂机野遇、签到金币")
+    ap.add_argument("--legacy", action="store_true", help="复现文档 v0.4 的口径：不算宝箱关、Boss 奖励、挂机野遇、签到金币、挂机掉落")
     ap.add_argument("--config", type=str, default=str(CONFIG_DIR))
     args = ap.parse_args()
     cfg = load_config(args.config)

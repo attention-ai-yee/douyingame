@@ -128,7 +128,9 @@ export interface ProgressionConfig {
   star: { costs: number[]; mults: number[]; shinyDupShards: number; shinyStatBonus: number };
   awaken: { enabled: boolean; shardCosts: number[]; essenceCosts: number[]; mults: number[]; skillBoostAtLevel: number };
   melt: { ratio: number };
-  slot: { costBase: number; costGrowth: number; statGrowth: number; unlocks: { stage: number; slots: number }[] };
+  /** 异兽等级：升级花金币和经验，属性按 statGrowth 增长。 */
+  level: { costBase: number; costGrowth: number; statGrowth: number; expRatio: number };
+  slots: { unlocks: { stage: number; slots: number }[] };
   synergyPower: { two: number; four: number };
   gold: {
     perMinBase: number;
@@ -136,14 +138,33 @@ export interface ProgressionConfig {
     firstClearMinutes: number;
     treasureEvery: number;
     treasureMult: number;
-    offlineRatio: number;
-    offlineCapHours: number;
-    /** 离线不足这么多分钟不算离线收益（避免刚启动就弹"离开了 0 分"）。 */
-    offlineMinMinutes: number;
   };
+  chest: {
+    capHours: number;
+    offlineRatio: number;
+    /** 离开超过这么多分钟，回来时自动弹出宝箱。 */
+    popupMinMinutes: number;
+    equipEveryMinutes: number;
+    ticketEveryHours: number;
+    fanShardEveryHours: number;
+    maxItems: number;
+  };
+  equip: EquipConfig;
   assist: { powerMult: number; dailyCap: number };
   wild: { stageClearChance: number; idleEveryHours: number; idleStoreCap: number; dailyCap: number };
   daily: { taskTickets: number };
+}
+
+export type EquipStat = 'atk' | 'hp';
+
+export interface EquipConfig {
+  slots: { name: string; stat: EquipStat }[];
+  quality: Record<Rarity, { pct: number; dismantleMinutes: number }>;
+  tierStages: number;
+  tierStep: number;
+  bagCap: number;
+  dropWeights: { fromStage: number; weights: Record<Rarity, number> }[];
+  firstClear: { smallBoss: Rarity; chapterBoss: Rarity };
 }
 
 // ---------------------------------------------------------------- stages.json

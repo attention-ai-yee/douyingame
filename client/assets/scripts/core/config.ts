@@ -88,6 +88,22 @@ export function validateConfig(cfg: GameConfig): string[] {
   if (p.awaken.shardCosts.length !== 5 || p.awaken.essenceCosts.length !== 5 || p.awaken.mults.length !== 6) {
     errs.push('觉醒：shardCosts/essenceCosts 应有 5 项、mults 应有 6 项');
   }
+  if (!(p.level.costGrowth > 1) || !(p.level.statGrowth > 1) || !(p.level.expRatio > 0)) errs.push('等级：costGrowth、statGrowth 应 > 1，expRatio 应 > 0');
+
+  // 装备与挂机宝箱
+  const eq = p.equip;
+  if (eq.slots.length !== 4) errs.push('装备：应有 4 个装备位');
+  for (const s of eq.slots) if (s.stat !== 'atk' && s.stat !== 'hp') errs.push(`装备位 ${s.name} 的属性只能是 atk 或 hp`);
+  for (const r of RARITIES) if (!eq.quality[r] || !(eq.quality[r].pct > 0)) errs.push(`装备品质 ${r} 缺少 pct`);
+  if (!eq.dropWeights.length || eq.dropWeights[0].fromStage !== 0) errs.push('装备掉落权重的第一档应从第 0 关开始');
+  for (const d of eq.dropWeights) {
+    let sum = 0;
+    for (const r of RARITIES) sum += d.weights[r] || 0;
+    if (!(sum > 0)) errs.push(`装备掉落权重（第 ${d.fromStage} 关起）之和应 > 0`);
+  }
+  const c = p.chest;
+  if (!(c.capHours > 0) || !(c.offlineRatio > 0 && c.offlineRatio <= 1)) errs.push('挂机宝箱：capHours 应 > 0，offlineRatio 应在 (0, 1]');
+  if (!(c.equipEveryMinutes > 0) || !(c.ticketEveryHours > 0) || !(c.fanShardEveryHours > 0)) errs.push('挂机宝箱：掉落间隔都应 > 0');
 
   // 关卡分段要连续覆盖 2..maxStage
   let expect = 2;

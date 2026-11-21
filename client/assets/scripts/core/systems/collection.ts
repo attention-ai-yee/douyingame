@@ -1,3 +1,4 @@
+import { newBeastState } from '../state';
 import { nextRarity, Rarity } from '../types';
 import { Ctx } from './context';
 
@@ -16,7 +17,7 @@ export function addBeast(ctx: Ctx, beastId: string, opts: { shiny?: boolean; ext
   const extra = opts.extraShards || 0;
   const b = ctx.s.beasts[beastId];
   if (!b) {
-    ctx.s.beasts[beastId] = { star: 1, shards: extra, awaken: 0, shiny, obtainedAt: ctx.now };
+    ctx.s.beasts[beastId] = newBeastState(ctx.now, { shards: extra, shiny });
     return { beastId, isNew: true, shardsGained: extra, newShiny: shiny };
   }
   const gained = (shiny ? p.star.shinyDupShards : 1) + extra;

@@ -11,10 +11,10 @@ describe('数值公式（与游戏设计文档第 8 节、18.4 节的表一致�
     expect(f.enemyPower(1)).toBe(60); // 新手关固定值
     expect(f.enemyPower(3)).toBe(130);
     expect(f.enemyBase(1)).toBe(450);
-    expect(f.enemyPower(4)).toBeCloseTo(450 * 1.14 ** 3, 6);
-    expect(f.enemyPower(10)).toBeCloseTo(1756, -1);
-    expect(f.enemyPower(40) / 1e4).toBeCloseTo(20.57, 0); // 文档：20.8 万
-    expect(f.enemyPower(120) / 1e8).toBeCloseTo(3.5, 0);
+    expect(f.enemyPower(4)).toBeCloseTo(450 * 1.143 ** 3, 6);
+    expect(f.enemyPower(10)).toBeCloseTo(1798, -1);
+    expect(f.enemyPower(40) / 1e4).toBeCloseTo(23.0, 0); // 文档：23.0 万
+    expect(f.enemyPower(120) / 1e8).toBeCloseTo(6.1, 0); // 文档：6.07 亿
     expect(f.isChapterBoss(40)).toBe(true);
     expect(f.isSmallBoss(40)).toBe(false);
     expect(f.isSmallBoss(30)).toBe(true);
@@ -27,9 +27,9 @@ describe('数值公式（与游戏设计文档第 8 节、18.4 节的表一致�
     expect(f.goldPerMin(120)).toBeCloseTo(62762, -2);
   });
 
-  it('镇妖塔：约第 253 层强度等于第 120 关，等效关卡在边界处连续', () => {
-    expect(f.towerFloorAtMainEnd).toBeGreaterThan(252);
-    expect(f.towerFloorAtMainEnd).toBeLessThan(254);
+  it('镇妖塔：约第 267 层强度等于第 120 关，等效关卡在边界处连续', () => {
+    expect(f.towerFloorAtMainEnd).toBeGreaterThan(267);
+    expect(f.towerFloorAtMainEnd).toBeLessThan(268);
     const b = f.towerFloorAtMainEnd;
     expect(f.towerEqStage(Math.floor(b))).toBeLessThanOrEqual(120.01);
     expect(f.towerEqStage(Math.ceil(b))).toBeGreaterThanOrEqual(119.99);
@@ -38,12 +38,17 @@ describe('数值公式（与游戏设计文档第 8 节、18.4 节的表一致�
     expect(f.towerEqStage(1)).toBeCloseTo(40, 5);
   });
 
-  it('阵位：开放数量、成本、系数', () => {
+  it('阵位开放数量；异兽等级的成本、系数、重置返还', () => {
     expect(f.slotsAt(0)).toBe(3);
     expect(f.slotsAt(10)).toBe(4);
     expect(f.slotsAt(40)).toBe(5);
-    expect(f.slotCost(1)).toBe(10);
-    expect(f.slotMult(100)).toBeCloseTo(510, 0);
+    expect(f.levelCost(1)).toBe(10);
+    expect(f.levelExpCost(1)).toBe(5);
+    expect(f.levelMult(100)).toBeCloseTo(510, 0);
+    let sum = 0;
+    for (let l = 1; l < 50; l++) sum += f.levelCost(l);
+    expect(f.levelTotalCost(50)).toBeCloseTo(sum, 6);
+    expect(f.levelTotalCost(1)).toBe(0);
   });
 
   it('探索度', () => {
@@ -74,7 +79,9 @@ out = {
   "tower": [m.tower_enemy(fl) for fl in (1, 10, 100, 400)],
   "towerEq": [m.tower_eq_stage(fl) for fl in (1, 50, 253, 300, 500)],
   "gold": [m.gold_per_min(x) for x in (1, 40.5, 120, 200)],
-  "slot": [[m.slot_cost(l), m.slot_mult(l)] for l in (1, 50, 150)],
+  "level": [[m.level_cost(l), m.level_mult(l)] for l in (1, 50, 150)],
+  "item": [m.item_pct(q, t) for q, t in (("fan", 1), ("ling", 2), ("xi", 3), ("chuanshuo", 5))],
+  "tier": [m.item_tier(x) for x in (0, 40, 40.5, 121)],
 }
 print(json.dumps(out))
 `;
@@ -85,8 +92,10 @@ print(json.dumps(out))
     [1, 50, 253, 300, 500].forEach((fl, i) => close(f.towerEqStage(fl), py.towerEq[i]));
     [1, 40.5, 120, 200].forEach((x, i) => close(f.goldPerMin(x), py.gold[i]));
     [1, 50, 150].forEach((l, i) => {
-      close(f.slotCost(l), py.slot[i][0]);
-      close(f.slotMult(l), py.slot[i][1]);
+      close(f.levelCost(l), py.level[i][0]);
+      close(f.levelMult(l), py.level[i][1]);
     });
+    ([['fan', 1], ['ling', 2], ['xi', 3], ['chuanshuo', 5]] as const).forEach(([q, t], i) => close(f.itemPct(q, t), py.item[i]));
+    [0, 40, 40.5, 121].forEach((x, i) => expect(f.itemTier(x)).toBe(py.tier[i]));
   });
 });
