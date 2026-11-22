@@ -5,6 +5,7 @@ import { makeBeastIcon, starText } from '../ui/BeastIcon';
 import { makeSprite, setSprite, Skin } from '../ui/Skin';
 import { hex, makeLabel, setLabel, uiNode } from '../ui/UiKit';
 import { alignedLabel, redDot, skinButton, SkinButton } from '../ui/Widgets';
+import { registerGuideTarget } from './GuideView';
 
 const OL = '#4a2f27';
 
@@ -55,7 +56,7 @@ function card(parent: Node, w: number, h: number, x: number, y: number, fill = '
 }
 
 /** 页面顶部的分页切换（例如"我的异兽 / 寻兽"）：选中的用红色按钮，其余用灰色。 */
-function segmented(parent: Node, names: string[], w: number, y: number, onPick: (i: number) => void): { set(i: number): void } {
+function segmented(parent: Node, names: string[], w: number, y: number, onPick: (i: number) => void): { set(i: number): void; nodes: Node[] } {
   const bw = Math.min(300, (w - 60) / names.length);
   const nodes = names.map((name, i) => {
     const n = makeSprite(parent, 'btn_ink', bw - 12, 76, (i - (names.length - 1) / 2) * bw, y, { fallback: '#2a2e36' });
@@ -64,6 +65,7 @@ function segmented(parent: Node, names: string[], w: number, y: number, onPick: 
     return n;
   });
   return {
+    nodes,
     set(i: number) {
       nodes.forEach((n, k) => {
         setSprite(n, k === i ? 'btn_red' : 'btn_ink', bw - 12, 76, { fallback: k === i ? '#b3261e' : '#2a2e36', color: k === i ? undefined : '#c8c0b6' });
@@ -77,7 +79,7 @@ function segmented(parent: Node, names: string[], w: number, y: number, onPick: 
 export class BeastsPage implements Page {
   node: Node;
   private tab = 0;
-  private seg: { set(i: number): void };
+  private seg: { set(i: number): void; nodes: Node[] };
   private mine: Node;
   private summon: Node;
   private grid: Node;
@@ -95,6 +97,7 @@ export class BeastsPage implements Page {
     const f = pageFrame(parent, w, h, y, '');
     this.node = f.root;
     this.seg = segmented(this.node, ['我的异兽', '寻兽'], w, h / 2 - 56, (i) => this.show(i));
+    registerGuideTarget('seg_summon', this.seg.nodes[1], 'beasts');
     // 我的异兽
     this.mine = uiNode('Mine', this.node);
     const hy = h / 2 - 140;
@@ -208,7 +211,8 @@ export class BeastsPage implements Page {
       alignedLabel(c, `${depthName} · 稀有 ${Math.round(rates.xi * 100)}% · 传说 ${Math.round(rates.chuanshuo * 100)}%`, 22, '#8a6d55', -cw / 2 + 30, chh / 2 - 92, 'left');
       const free = core.canFreeTenPull();
       skinButton(c, 'btn_ink', '寻兽 ×1', 230, 90, () => this.host.doPull(m.id, 1), -cw / 4 + 10, -chh / 2 + 62, '寻兽符 ×1');
-      skinButton(c, 'btn_red', '寻兽 ×10', 260, 90, () => this.host.doPull(m.id, 10), cw / 4 - 10, -chh / 2 + 62, free ? '今日免费' : '寻兽符 ×10');
+      const ten = skinButton(c, 'btn_red', '寻兽 ×10', 260, 90, () => this.host.doPull(m.id, 10), cw / 4 - 10, -chh / 2 + 62, free ? '今日免费' : '寻兽符 ×10');
+      registerGuideTarget(`pull10_${m.id}`, ten.node, 'beasts');
     });
   }
 
@@ -282,6 +286,7 @@ export class MountainPage implements Page {
       if (unlocked) {
         const done = cleared >= len;
         const b = skinButton(c, done ? 'btn_jade' : 'btn_red', done ? '已通关' : '进入', 200, 84, () => this.open(ch.id), cw / 2 - 130, -20);
+        registerGuideTarget(`map_enter_${ch.id}`, b.node, 'mountain');
         if (!done && core.canBeatNextStage() && core.f.chapterOfStage(core.state.stage + 1) === ch.id) redDot(b.node, 90, 32);
       }
     });
@@ -340,7 +345,8 @@ export class MountainPage implements Page {
       const ok = core.teamPower() >= next.enemyPower;
       const by = -this.h / 2 + 70;
       makeLabel(this.body, `第 ${next.stage - from} 关 敌方战力 ${formatNumber(next.enemyPower)}${ok ? '' : '（还差一点，先去升级）'}`, 22, ok ? '#2f8f68' : '#b3261e', 0, by + 64);
-      skinButton(this.body, 'btn_red', `挑战第 ${next.stage - from} 关`, 320, 92, () => this.host.openStage('stage'), 0, by);
+      const go = skinButton(this.body, 'btn_red', `挑战第 ${next.stage - from} 关`, 320, 92, () => this.host.openStage('stage'), 0, by);
+      registerGuideTarget('stage_challenge', go.node, 'mountain');
     }
   }
 }

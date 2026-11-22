@@ -148,6 +148,9 @@ export interface ProgressionConfig {
     ticketEveryHours: number;
     fanShardEveryHours: number;
     maxItems: number;
+    /** 新手引导的第一个宝箱额外放多少分钟产出、几件装备。 */
+    tutorialMinutes: number;
+    tutorialItems: number;
   };
   equip: EquipConfig;
   assist: { powerMult: number; dailyCap: number };

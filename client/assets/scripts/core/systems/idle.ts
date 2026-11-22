@@ -57,6 +57,14 @@ export function fillChest(ctx: Ctx, dtMs: number, ratio: number): number {
   return real;
 }
 
+/** 新手引导：往宝箱里额外放 minutes 分钟的产出和 items 件装备（不占宝箱时长）。 */
+export function addBonusToChest(ctx: Ctx, minutes: number, items: number): void {
+  const ch = ctx.s.chest;
+  ch.gold += idleGoldPerMin(ctx) * minutes;
+  ch.exp += idleExpPerMin(ctx) * minutes;
+  for (let i = 0; i < items; i++) ch.items.push(newItem(ctx, { minQ: i === 0 ? 'ling' : undefined }));
+}
+
 export function chestFull(ctx: Ctx): boolean {
   return ctx.s.chest.ms >= ctx.idx.cfg.progression.chest.capHours * HOUR;
 }

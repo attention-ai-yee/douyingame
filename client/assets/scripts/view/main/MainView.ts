@@ -9,6 +9,7 @@ import { BagPopup } from './BagPopup';
 import { BattleView } from './BattleView';
 import { BeastDetail } from './BeastDetail';
 import { itemName, makeItemIcon } from './ItemIcon';
+import { GuideView, registerGuideTarget } from './GuideView';
 import { LootFly } from './LootFly';
 import { BeastsPage, BookPage, describePull, MainHooks, MorePage, MountainPage, Page, PageHost } from './Pages';
 import { StageView } from './StageView';
@@ -100,6 +101,7 @@ export class MainView extends Component implements PageHost {
     this.chestX = W / 2 - 92;
     this.chestY = this.battleY - 290 + 96;
     this.chest = makeSprite(this.node, 'chest_box', 150, 150, this.chestX, this.chestY + 14, { fallback: '#c9773b' });
+    registerGuideTarget('chest', this.chest, 'battle');
     this.chest.on(Node.EventType.TOUCH_END, () => this.showChest(false));
     const barBg = uiNode('ChestBar', this.node, this.chestX, this.chestY - 62);
     this.chestBar = barBg.addComponent(Graphics);
@@ -107,6 +109,7 @@ export class MainView extends Component implements PageHost {
 
     // 右上悬浮按钮（在战斗区的天空里）
     this.signinBtn = iconButton(this.node, 'icon_signin', 86, '签到', () => this.showSignin(), W / 2 - 58, battleTop - 66);
+    registerGuideTarget('signin_btn', this.signinBtn.node, 'battle');
     this.wildBtn = iconButton(this.node, 'icon_wild', 86, '野遇', () => this.claimWild(), W / 2 - 158, battleTop - 66);
     this.wildBtn.node.active = false;
 
@@ -120,6 +123,7 @@ export class MainView extends Component implements PageHost {
     // 一键升级 / 一键穿戴
     const upY = top - 1030;
     this.upgradeBtn = skinButton(this.node, 'btn_red', '一键升级', 430, 112, () => this.onUpgrade(), -W / 2 + 245, upY, '');
+    registerGuideTarget('upgrade', this.upgradeBtn.node, 'battle');
     this.equipBtn = skinButton(this.node, 'btn_gold', '一键穿戴', 240, 104, () => this.onEquipBest(), W / 2 - 145, upY);
     this.equipDot = redDot(this.equipBtn.node, 104, 36);
     this.infoL = makeLabel(this.node, '', 22, '#8a6d55', 0, top - 1108);
@@ -144,12 +148,21 @@ export class MainView extends Component implements PageHost {
       icon.on(Node.EventType.TOUCH_END, () => this.switchTab(t.key));
       makeLabel(this.node, t.name, 24, OL, x, bottom + 34);
       this.tabIcons[t.key] = icon;
+      registerGuideTarget(`tab_${t.key}`, icon);
       const dot = redDot(this.node, x + 38, bottom + 144);
       dot.active = false;
       this.tabDots[t.key] = dot;
     });
     // 闯关界面、详情弹窗都放在最上层
     this.overlay = uiNode('Overlay', this.node);
+    // 新手引导的指引层盖在最上面（拍符界面除外）
+    GuideView.create(this.node, {
+      root: this.node,
+      overlay: this.overlay,
+      isModalOpen: () => this.popupOpen,
+      currentTab: () => this.current,
+      onFinished: () => this.toast('新手引导完成！\n挂机攒资源、升级变强，去进山一关关打过去吧'),
+    });
     this.switchTab('battle');
 
     App.core.events.on('offline', (r) => {
@@ -288,7 +301,8 @@ export class MainView extends Component implements PageHost {
       this.toast(this.describeClaim(got, n));
       pop.close();
     };
-    skinButton(body, 'btn_ink', '领取', 230, 96, () => claim(1), -150, -290);
+    const claimBtn = skinButton(body, 'btn_ink', '领取', 230, 96, () => claim(1), -150, -290);
+    registerGuideTarget('chest_claim', claimBtn.node);
     const ad = skinButton(body, 'btn_gold', `看视频 ×${mult}`, 270, 96, async () => {
       const r = await App.ads.showRewarded('offline_double');
       if (!r.granted) {
@@ -584,7 +598,8 @@ export class MainView extends Component implements PageHost {
         makeLabel(pop.body, App.core.idx.beast[id].name, 24, OL, x, -320);
       });
     } else {
-      skinButton(pop.body, 'btn_red', '签到领取', 320, 104, () => finish(), 0, -230);
+      const btn = skinButton(pop.body, 'btn_red', '签到领取', 320, 104, () => finish(), 0, -230);
+      registerGuideTarget('signin_claim', btn.node);
     }
   }
 

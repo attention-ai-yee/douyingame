@@ -13,6 +13,7 @@ import * as gacha from './systems/gacha';
 import * as idle from './systems/idle';
 import * as progression from './systems/progression';
 import * as stage from './systems/stage';
+import * as tutorial from './systems/tutorial';
 
 export interface PendingReveal {
   id: number;
@@ -55,6 +56,8 @@ export interface CoreEvents {
   teamChanged: (string | null)[];
   offline: idle.OfflineResult;
   chestClaimed: idle.ChestClaim;
+  /** 新手引导前进到 step（null 表示引导完成）。 */
+  tutorialStep: tutorial.TutorialStep | null;
   dailyReset: string;
 }
 
@@ -85,6 +88,7 @@ export class GameCore {
     this.state = opts.state || createInitialState(now, opts.seed === undefined ? 1 : opts.seed);
     this.rng = new Rng(this.state.rngState);
     this.lastTick = now;
+    tutorial.autoSkipForVeterans(this.ctx(now));
   }
 
   /** 从存档字符串恢复；没有存档或存档损坏时新建。 */
@@ -223,6 +227,7 @@ export class GameCore {
       if (r.needsReveal) this.enqueueReveal(r.beastId, 'pull', false, r.shiny);
     }
     this.events.emit('pulled', { mountainId, results });
+    this.advanceTutorial('summon');
     return { ok: true, results };
   }
 
@@ -284,6 +289,7 @@ export class GameCore {
     const win = power >= info.enemyPower;
     if (win) {
       const reward = stage.completeStage(ctx) as stage.StageReward;
+      this.advanceTutorial('stage');
       if (reward.captureBeast) {
         collection.addBeast(ctx, reward.captureBeast);
         this.enqueueReveal(reward.captureBeast, 'boss', true, false);
@@ -349,14 +355,20 @@ export class GameCore {
 
   levelUp(beastId: string, times = 1): number {
     const n = progression.levelUp(this.ctx(), beastId, times);
-    if (n) this.events.emit('beastChanged', { beastId });
+    if (n) {
+      this.events.emit('beastChanged', { beastId });
+      this.advanceTutorial('upgrade');
+    }
     return n;
   }
 
   /** 一键升级：给上阵异兽里等级最低的轮流升级，直到金币或经验不够。 */
   upgradeTeam(): number {
     const n = progression.upgradeTeam(this.ctx());
-    if (n) this.events.emit('teamChanged', this.state.team);
+    if (n) {
+      this.events.emit('teamChanged', this.state.team);
+      this.advanceTutorial('upgrade');
+    }
     return n;
   }
 
@@ -474,7 +486,43 @@ export class GameCore {
   claimChest(mult = 1): idle.ChestClaim {
     const res = idle.claimChest(this.ctx(), mult);
     this.events.emit('chestClaimed', res);
+    this.advanceTutorial('chest');
     return res;
+  }
+
+  // ------------------------------------------------------------ 新手引导
+
+  /**
+   * 当前引导步骤；null 表示已完成。玩家先做了后面的事也不会卡住：
+   * 已经打过第 1 关就跳过"闯关"，没有免费十连也没有寻兽符就跳过"寻兽"。
+   */
+  tutorialStep(): tutorial.TutorialStep | null {
+    const step = tutorial.currentStep(this.ctx());
+    if (step === 'stage' && this.state.stage >= 1) {
+      this.advanceTutorial('stage');
+      return this.tutorialStep();
+    }
+    if (step === 'summon' && !this.canFreeTenPull() && this.state.tickets < 1) {
+      this.advanceTutorial('summon');
+      return this.tutorialStep();
+    }
+    return step;
+  }
+
+  skipTutorial(): void {
+    tutorial.skip(this.ctx());
+    this.events.emit('tutorialStep', null);
+  }
+
+  private advanceTutorial(key: tutorial.TutorialStep): void {
+    const ctx = this.ctx();
+    if (!tutorial.advance(ctx, key)) return;
+    const next = tutorial.currentStep(ctx);
+    if (next === 'chest') {
+      const c = this.idx.cfg.progression.chest;
+      idle.addBonusToChest(ctx, c.tutorialMinutes || 0, c.tutorialItems || 0);
+    }
+    this.events.emit('tutorialStep', next);
   }
 
   canClaimSignin(): boolean {
@@ -484,6 +532,7 @@ export class GameCore {
   claimSignin(choice?: string): daily.SigninResult | null {
     const ctx = this.ctx();
     const res = daily.claimSignin(ctx, idle.idleGoldPerMin(ctx), idle.idleExpPerMin(ctx), choice);
+    if (res) this.advanceTutorial('signin');
     if (res && res.beastId) {
       const added = collection.addBeast(ctx, res.beastId);
       const r = this.idx.beast[res.beastId].rarity;

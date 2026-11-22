@@ -301,6 +301,50 @@ describe('存档', () => {
   });
 });
 
+describe('新手引导', () => {
+  it('签到 → 领宝箱 → 升级 → 闯第 1 关 → 寻兽，按顺序前进；领签到后宝箱里多放一份新手奖励', () => {
+    const { core } = makeCore();
+    core.resume();
+    expect(core.tutorialStep()).toBe('signin');
+    core.claimChest(); // 不按顺序的操作不会前进
+    expect(core.tutorialStep()).toBe('signin');
+    core.claimSignin();
+    expect(core.tutorialStep()).toBe('chest');
+    expect(core.state.chest.gold).toBeGreaterThan(0);
+    expect(core.state.chest.items.length).toBe(2);
+    expect(core.state.chest.items[0].q).not.toBe('fan');
+    core.claimChest();
+    expect(core.tutorialStep()).toBe('upgrade');
+    expect(core.upgradeTeam()).toBeGreaterThan(0); // 新手宝箱够升好几级
+    expect(core.tutorialStep()).toBe('stage');
+    expect(core.challengeStage().win).toBe(true);
+    expect(core.tutorialStep()).toBe('summon');
+    core.pull('nanshan', 10);
+    expect(core.tutorialStep()).toBeNull();
+    expect(core.state.tutorial.done).toBe(true);
+  });
+
+  it('先打了第 1 关、没有免费十连也没有寻兽符时自动跳过对应步骤；可以手动跳过', () => {
+    const { core } = makeCore();
+    core.state.tutorial.step = 3; // stage
+    core.state.stage = 1;
+    core.state.daily.freeTenPullsUsed = 1;
+    core.state.daily.dayKey = 'x';
+    expect(core.tutorialStep()).not.toBe('stage');
+    const { core: c2 } = makeCore();
+    c2.skipTutorial();
+    expect(c2.tutorialStep()).toBeNull();
+  });
+
+  it('老存档（已经打了几关）直接视为完成引导', () => {
+    const { core, clock } = makeCore();
+    core.state.stage = 9;
+    const state = GameCore.loadState(core.serialize(), clock.now(), 1);
+    const core2 = new GameCore(loadConfig(), { clock: clock.now, state });
+    expect(core2.tutorialStep()).toBeNull();
+  });
+});
+
 describe('存档升级 v1 → v2', () => {
   it('阵位等级挪到所在阵位的异兽身上，离线收益并进宝箱', () => {
     const v1 = {

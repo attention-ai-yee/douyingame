@@ -34,7 +34,9 @@
     "ticketEveryHours": 3,
     "fanShardEveryHours": 4,
     "maxItems": 40,
-    "_doc": "宝箱最多攒 capHours 小时（在线离线都算）；离线时产出按 offlineRatio 打折。每 equipEveryMinutes 分钟（按折算后的挂机时间）掉 1 件装备，超过 maxItems 件的自动分解成金币。离开超过 popupMinMinutes 分钟，回来时自动弹出宝箱。"
+    "tutorialMinutes": 15,
+    "tutorialItems": 2,
+    "_doc": "宝箱最多攒 capHours 小时（在线离线都算）；离线时产出按 offlineRatio 打折。每 equipEveryMinutes 分钟（按折算后的挂机时间）掉 1 件装备，超过 maxItems 件的自动分解成金币。离开超过 popupMinMinutes 分钟，回来时自动弹出宝箱。新手引导走到「领宝箱」这一步时，宝箱里额外放 tutorialMinutes 分钟的产出和 tutorialItems 件装备。"
   },
   "equip": {
     "slots": [
