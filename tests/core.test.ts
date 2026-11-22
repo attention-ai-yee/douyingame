@@ -301,6 +301,25 @@ describe('存档', () => {
   });
 });
 
+describe('五行羁绊', () => {
+  it('同系 2 只 +10%，4 只再 +15%；有可凑羁绊的异兽时给提示', () => {
+    const { core } = makeCore();
+    core.state.beasts.huahuai = newBeastState(0);
+    core.state.beasts.huan = newBeastState(0);
+    core.state.beasts.bifang = newBeastState(0);
+    core.state.team = ['huahuai', 'lei', null, null, null];
+    let s = core.synergies();
+    expect(s.active).toEqual([]);
+    expect(s.hint).toContain('火·燎原');
+    core.state.team = ['huahuai', 'huan', 'lei', null, null];
+    s = core.synergies();
+    expect(s.active).toEqual([{ element: 'huo', count: 2, bonus: 0.1 }]);
+    core.state.stage = 10; // 开第 4 阵位
+    core.state.team = ['huahuai', 'huan', 'bifang', 'lei', null];
+    expect(core.synergies().active[0].count).toBe(3);
+  });
+});
+
 describe('每日任务', () => {
   it('挑战、寻兽、升级、领宝箱、看视频计数；每项领寻兽符，全部完成再领金币经验；跨天重置', () => {
     const { core, clock } = makeCore();

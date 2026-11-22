@@ -38,6 +38,8 @@ export interface ElementDef {
   name: string;
   color: string;
   beats: Element;
+  /** 五行羁绊名（游戏设计文档 7.3），例如火·燎原。 */
+  bond?: string;
 }
 
 export interface RoleDef {

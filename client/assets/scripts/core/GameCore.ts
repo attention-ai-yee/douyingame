@@ -4,7 +4,7 @@ import { Formulas } from './formulas';
 import { RevealSession } from './reveal/RevealSession';
 import { Rng } from './rng';
 import { createInitialState, Item, migrate, PlayerState } from './state';
-import { DailyTaskId, DepthId, GameConfig, Rarity, RevealSource } from './types';
+import { DailyTaskId, DepthId, Element, GameConfig, Rarity, RevealSource } from './types';
 import * as collection from './systems/collection';
 import { Ctx } from './systems/context';
 import * as daily from './systems/daily';
@@ -170,6 +170,41 @@ export class GameCore {
 
   idleEqStage(): number {
     return idle.idleEqStage(this.ctx());
+  }
+
+  /**
+   * 上阵异兽的五行羁绊（游戏设计文档 7.3）：同系 2 只 +10% 战力，4 只再 +15%。
+   * 返回已激活的，以及"再上 1 只就能激活"的提示。
+   */
+  synergies(): { active: { element: string; count: number; bonus: number }[]; hint: string | null } {
+    const sp = this.idx.cfg.progression.synergyPower;
+    const count: Record<string, number> = {};
+    for (const id of this.teamIds()) {
+      const e = this.idx.beast[id].element;
+      count[e] = (count[e] || 0) + 1;
+    }
+    const active: { element: string; count: number; bonus: number }[] = [];
+    for (const e in count) {
+      const c = count[e];
+      if (c >= 2) active.push({ element: e, count: c, bonus: sp.two + (c >= 4 ? sp.four : 0) });
+    }
+    active.sort((a, b) => b.count - a.count);
+    // 提示：已拥有但没上阵、能把某系凑到 2 只（或 4 只）的
+    let hint: string | null = null;
+    const free = this.slotsAvailable() - this.teamIds().length;
+    const onTeam: Record<string, boolean> = {};
+    for (const id of this.teamIds()) onTeam[id] = true;
+    for (const e in count) {
+      const need = count[e] === 1 ? 2 : count[e] === 3 ? 4 : 0;
+      if (!need) continue;
+      const spare = Object.keys(this.state.beasts).some((id) => !onTeam[id] && this.idx.beast[id].element === e);
+      if (spare) {
+        const el = this.idx.cfg.beasts.elements[e as Element];
+        hint = `再上 1 只${el.name}系可激活「${el.name}·${el.bond || ''}」${free > 0 ? '' : '（换下一只）'}`;
+        break;
+      }
+    }
+    return { active, hint };
   }
 
   /** 下一关能不能打过（进山页的红点、"可挑战"提示用）。 */

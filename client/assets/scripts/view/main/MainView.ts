@@ -15,6 +15,7 @@ import { BeastsPage, BookPage, MainHooks, MorePage, MountainPage, Page, PageHost
 import { PullRevealView } from './PullRevealView';
 import { StageView } from './StageView';
 import { TasksPopup } from './TasksPopup';
+import { TextPopup } from '../more/TextPopup';
 
 const { ccclass } = _decorator;
 const OL = '#4a2f27';
@@ -62,6 +63,7 @@ export class MainView extends Component implements PageHost {
   private chestY = 0;
   private battleY = 0;
   private team!: Node;
+  private bondL!: Label;
   private teamSig = '';
   private upgradeBtn!: SkinButton;
   private equipBtn!: SkinButton;
@@ -123,6 +125,7 @@ export class MainView extends Component implements PageHost {
     makeSprite(this.node, 'panel_paper', W - 30, 214, 0, teamY, { fallback: '#fff8ea' });
     const tag = makeSprite(this.node, 'pill', 150, 46, -W / 2 + 110, teamY + 104, { fallback: '#fffaf0' });
     makeLabel(tag, '上阵异兽', 22, OL);
+    this.bondL = alignedLabel(this.node, '', 20, '#b3261e', W / 2 - 40, teamY + 104, 'right');
     this.team = uiNode('Team', this.node, 0, teamY);
 
     // 一键升级 / 一键穿戴
@@ -198,6 +201,7 @@ export class MainView extends Component implements PageHost {
     this.taskBtn.dot.active = core.hasTaskReward();
     this.refreshChest();
     this.refreshTeam();
+    this.refreshBond();
     this.refreshUpgrade();
     const canBeat = core.canBeatNextStage();
     (this.tabDots.mountain as Node).active = canBeat;
@@ -370,6 +374,19 @@ export class MainView extends Component implements PageHost {
     }
   }
 
+  /** 五行羁绊：已激活的写出来，没有时提示怎么凑。 */
+  private refreshBond(): void {
+    const sy = App.core.synergies();
+    const els = App.cfg.beasts.elements;
+    if (sy.active.length) {
+      const txt = sy.active.map((a) => {
+        const e = els[a.element as keyof typeof els];
+        return `${e.name}·${e.bond || ''}×${a.count} 战力+${Math.round(a.bonus * 100)}%`;
+      });
+      setLabel(this.bondL, '羁绊：' + txt.join('  '), '#b3261e');
+    } else setLabel(this.bondL, sy.hint || '同系 2 只上阵可激活五行羁绊', '#8a6d55');
+  }
+
   private refreshUpgrade(): void {
     const core = App.core;
     const cost = core.nextTeamUpgradeCost();
@@ -455,6 +472,14 @@ export class MainView extends Component implements PageHost {
     BeastDetail.open(this.overlay, id, (t) => this.toast(t), () => {
       this.popupOpen = false;
       this.teamSig = '';
+    });
+  }
+
+  openText(title: string, text: string): void {
+    if (this.popupOpen) return;
+    this.popupOpen = true;
+    TextPopup.open(this.overlay, title, text, () => {
+      this.popupOpen = false;
     });
   }
 

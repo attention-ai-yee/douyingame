@@ -5,6 +5,7 @@ import { makeBeastIcon, starText } from '../ui/BeastIcon';
 import { makeSprite, setSprite, Skin } from '../ui/Skin';
 import { hex, makeLabel, setLabel, uiNode } from '../ui/UiKit';
 import { alignedLabel, redDot, skinButton, SkinButton } from '../ui/Widgets';
+import { PRIVACY_POLICY, USER_AGREEMENT } from '../more/LegalText';
 import { registerGuideTarget } from './GuideView';
 
 const OL = '#4a2f27';
@@ -24,6 +25,7 @@ export interface PageHost {
   openBeast(id: string): void;
   openBag(): void;
   openStage(kind: 'stage' | 'tower'): void;
+  openText(title: string, text: string): void;
 }
 
 export interface Page {
@@ -414,6 +416,9 @@ export class MorePage implements Page {
       App.core.state.settings.vibrate = !App.core.state.settings.vibrate;
       App.save();
     }, w / 2 - 120, yy);
+    yy -= 90;
+    skinButton(this.node, 'btn_ink', '用户协议', 280, 72, () => this.host.openText('用户协议', USER_AGREEMENT), -w / 4 + 10, yy);
+    skinButton(this.node, 'btn_ink', '隐私政策', 280, 72, () => this.host.openText('隐私政策', PRIVACY_POLICY), w / 4 - 10, yy);
     yy -= 100;
     alignedLabel(this.node, '开发者工具（上线前隐藏）', 30, OL, -w / 2 + 40, yy, 'left');
     yy -= 80;

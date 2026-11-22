@@ -7,11 +7,11 @@
     "chuanshuo": { "name": "传说", "power": 280, "atk": 28, "hp": 280, "spd": [105, 125], "color": "#f5a623" }
   },
   "elements": {
-    "mu":   { "name": "木", "color": "#4caf50", "beats": "tu" },
-    "huo":  { "name": "火", "color": "#e53935", "beats": "jin" },
-    "tu":   { "name": "土", "color": "#c9a227", "beats": "shui" },
-    "jin":  { "name": "金", "color": "#eceff1", "beats": "mu" },
-    "shui": { "name": "水", "color": "#2196f3", "beats": "huo" }
+    "mu":   { "name": "木", "color": "#4caf50", "beats": "tu", "bond": "生生不息" },
+    "huo":  { "name": "火", "color": "#e53935", "beats": "jin", "bond": "燎原" },
+    "tu":   { "name": "土", "color": "#c9a227", "beats": "shui", "bond": "厚德" },
+    "jin":  { "name": "金", "color": "#eceff1", "beats": "mu", "bond": "锐金" },
+    "shui": { "name": "水", "color": "#2196f3", "beats": "huo", "bond": "润下" }
   },
   "elementCounter": { "advantage": 1.3, "disadvantage": 0.8 },
   "roles": {

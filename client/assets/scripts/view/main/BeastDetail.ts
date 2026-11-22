@@ -1,6 +1,6 @@
 import { Label, Node } from 'cc';
 import { App } from '../../app/App';
-import { formatNumber } from '../../core';
+import { formatNumber, nextRarity } from '../../core';
 import { makeBeastIcon, starText } from '../ui/BeastIcon';
 import { makeSprite, Skin } from '../ui/Skin';
 import { makeLabel, setLabel, uiNode } from '../ui/UiKit';
@@ -71,7 +71,15 @@ export class BeastDetail {
     const starCost = core.starUpCost(id);
     makeLabel(body, '升星', 28, OL, -270, -70);
     if (starCost === null) {
-      alignedLabel(body, '已满星', 22, '#6b5444', -200, -70, 'left');
+      const ratio = App.cfg.progression.melt.ratio;
+      const to = nextRarity(def.rarity);
+      const n = Math.floor(b.shards / ratio);
+      if (!to) alignedLabel(body, `已满星 · 星魄 ${b.shards}`, 22, '#6b5444', -200, -70, 'left');
+      else {
+        alignedLabel(body, `已满星 · 星魄 ${b.shards}（${ratio} 个换 1 个${App.cfg.beasts.rarities[to].name}级万能星魄）`, 20, '#6b5444', -200, -70, 'left');
+        const mb = skinButton(body, 'btn_jade', '熔炼', 150, 66, () => this.onMelt(n * ratio), 245, -70);
+        mb.setEnabled(n > 0);
+      }
     } else {
       const wild = core.state.wildShards[def.rarity];
       alignedLabel(body, `星魄 ${b.shards}/${starCost}（万能 ${wild}）`, 22, '#6b5444', -200, -70, 'left');
@@ -124,6 +132,15 @@ export class BeastDetail {
       App.save();
       this.rebuild();
     }
+  }
+
+  private onMelt(count: number): void {
+    const got = App.core.melt(this.id, count);
+    if (!got) return;
+    App.analytics.track('melt', { beast: this.id, count, got });
+    App.save();
+    this.toast(`熔炼得到 ${got} 个万能星魄`);
+    this.rebuild();
   }
 
   private onEquipBest(): void {
