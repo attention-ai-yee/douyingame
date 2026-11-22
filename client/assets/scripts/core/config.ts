@@ -101,6 +101,12 @@ export function validateConfig(cfg: GameConfig): string[] {
     for (const r of RARITIES) sum += d.weights[r] || 0;
     if (!(sum > 0)) errs.push(`装备掉落权重（第 ${d.fromStage} 关起）之和应 > 0`);
   }
+  const ids: Record<string, boolean> = {};
+  for (const t of p.daily.tasks) {
+    if (ids[t.id]) errs.push(`每日任务 ${t.id} 重复`);
+    ids[t.id] = true;
+    if (!(t.target > 0)) errs.push(`每日任务 ${t.id} 的目标次数应 > 0`);
+  }
   const c = p.chest;
   if (!(c.capHours > 0) || !(c.offlineRatio > 0 && c.offlineRatio <= 1)) errs.push('挂机宝箱：capHours 应 > 0，offlineRatio 应在 (0, 1]');
   if (!(c.equipEveryMinutes > 0) || !(c.ticketEveryHours > 0) || !(c.fanShardEveryHours > 0)) errs.push('挂机宝箱：掉落间隔都应 > 0');

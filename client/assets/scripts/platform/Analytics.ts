@@ -27,7 +27,8 @@ export type EventName =
   | 'ad_click'
   | 'ad_complete'
   | 'ad_fail'
-  | 'chest_claim';
+  | 'chest_claim'
+  | 'task_claim';
 
 export class Analytics {
   /** 最近的事件，调试面板可以显示。 */

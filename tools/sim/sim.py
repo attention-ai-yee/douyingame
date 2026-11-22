@@ -61,7 +61,11 @@ class Model:
         self.gold = g
         self.assist_mult, self.assist_cap = prog["assist"]["powerMult"], prog["assist"]["dailyCap"]
         self.wild = prog["wild"]
-        self.task_tickets = prog["daily"]["taskTickets"]
+        dl = prog["daily"]
+        # 每日任务：不看广告的玩家拿不到"看视频"那一项；全部完成的金币经验只算看广告型
+        self.task_tickets_ad = sum(t["tickets"] for t in dl["tasks"])
+        self.task_tickets_noad = sum(t["tickets"] for t in dl["tasks"] if t["id"] != "ads")
+        self.task_all_minutes = dl["allDoneMinutes"]
         # 兽池
         self.mountains = sorted(pools["mountains"], key=lambda m: m["chapter"])
         self.depth_rates = {k: v["rates"] for k, v in pools["depths"].items()}
@@ -485,7 +489,10 @@ def run(model, scen, ptype_name, days, seed, tower=True, awaken_from_day=None, e
         else:
             sessions = scen["sessions"]["daily"]
             views = ptype["adTicketViews"] if p.ad else 0
-            pulls = model.free_ten * 10 + model.task_tickets + views * ad_tickets + bonus_tickets
+            task_tickets = model.task_tickets_ad if p.ad else model.task_tickets_noad
+            pulls = model.free_ten * 10 + task_tickets + views * ad_tickets + bonus_tickets
+            if p.ad and p.extras:
+                p.earn(model.task_all_minutes)  # 每日任务全部完成：30 分钟金币经验
         p.ads += views
         first = True
         for i, (hr, mins) in enumerate(sessions):

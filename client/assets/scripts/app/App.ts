@@ -50,7 +50,11 @@ export class App {
       floor: App.core.state.floor,
       days: Math.floor((platform.now() - App.core.state.createdAt) / 86400000),
     }));
-    App.ads = new AdService(platform, App.cfg.ads, App.analytics, { release: RELEASE, installAt: () => App.core.state.createdAt });
+    App.ads = new AdService(platform, App.cfg.ads, App.analytics, {
+      release: RELEASE,
+      installAt: () => App.core.state.createdAt,
+      onWatched: () => App.core.recordAdWatched(),
+    });
 
     App.core.resume();
     App.startSession();

@@ -80,6 +80,7 @@ export class GuideView extends Component {
   private skip!: Node;
   private t = 0;
   private lastStep: TutorialStep | null | undefined = undefined;
+  private skipped = false;
 
   private setup(host: GuideHost): void {
     this.host = host;
@@ -91,6 +92,7 @@ export class GuideView extends Component {
     this.skip = makeSprite(this.node, 'pill', 150, 48, 0, 0, { fallback: '#fffaf0', alpha: 220 });
     makeLabel(this.skip, '跳过引导', 22, '#8a6d55');
     this.skip.on(Node.EventType.TOUCH_END, () => {
+      this.skipped = true;
       App.core.skipTutorial();
       App.analytics.track('tutorial_step', { step: 'skip' });
       App.save();
@@ -110,7 +112,7 @@ export class GuideView extends Component {
     const step = App.core.tutorialStep();
     if (step !== this.lastStep) {
       if (this.lastStep !== undefined) App.analytics.track('tutorial_step', { step: step || 'done' });
-      if (this.lastStep && !step) this.host.onFinished();
+      if (this.lastStep && !step && !this.skipped) this.host.onFinished();
       this.lastStep = step;
     }
     this.skip.active = !!step && !App.core.revealQueue.length && !this.host.isModalOpen();

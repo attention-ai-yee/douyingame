@@ -13,6 +13,7 @@ import { GuideView, registerGuideTarget } from './GuideView';
 import { LootFly } from './LootFly';
 import { BeastsPage, BookPage, describePull, MainHooks, MorePage, MountainPage, Page, PageHost } from './Pages';
 import { StageView } from './StageView';
+import { TasksPopup } from './TasksPopup';
 
 const { ccclass } = _decorator;
 const OL = '#4a2f27';
@@ -51,6 +52,7 @@ export class MainView extends Component implements PageHost {
   private stageR!: Label;
   private signinBtn!: { node: Node; dot: Node };
   private wildBtn!: { node: Node; dot: Node; title: Label };
+  private taskBtn!: { node: Node; dot: Node; title: Label };
   private chest!: Node;
   private chestBar!: Graphics;
   private chestL!: Label;
@@ -110,7 +112,8 @@ export class MainView extends Component implements PageHost {
     // 右上悬浮按钮（在战斗区的天空里）
     this.signinBtn = iconButton(this.node, 'icon_signin', 86, '签到', () => this.showSignin(), W / 2 - 58, battleTop - 66);
     registerGuideTarget('signin_btn', this.signinBtn.node, 'battle');
-    this.wildBtn = iconButton(this.node, 'icon_wild', 86, '野遇', () => this.claimWild(), W / 2 - 158, battleTop - 66);
+    this.taskBtn = iconButton(this.node, 'icon_task', 86, '任务', () => this.openTasks(), W / 2 - 158, battleTop - 66);
+    this.wildBtn = iconButton(this.node, 'icon_wild', 86, '野遇', () => this.claimWild(), W / 2 - 258, battleTop - 66);
     this.wildBtn.node.active = false;
 
     // 上阵异兽
@@ -190,6 +193,7 @@ export class MainView extends Component implements PageHost {
     if (core.fillEmptySlots()) App.save();
     this.signinBtn.dot.active = core.canClaimSignin();
     this.wildBtn.node.active = s.wildStore > 0;
+    this.taskBtn.dot.active = core.hasTaskReward();
     this.refreshChest();
     this.refreshTeam();
     this.refreshUpgrade();
@@ -449,6 +453,14 @@ export class MainView extends Component implements PageHost {
     BeastDetail.open(this.overlay, id, (t) => this.toast(t), () => {
       this.popupOpen = false;
       this.teamSig = '';
+    });
+  }
+
+  openTasks(): void {
+    if (this.popupOpen) return;
+    this.popupOpen = true;
+    TasksPopup.open(this.overlay, (t) => this.toast(t), () => {
+      this.popupOpen = false;
     });
   }
 

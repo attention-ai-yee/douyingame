@@ -155,7 +155,16 @@ export interface ProgressionConfig {
   equip: EquipConfig;
   assist: { powerMult: number; dailyCap: number };
   wild: { stageClearChance: number; idleEveryHours: number; idleStoreCap: number; dailyCap: number };
-  daily: { taskTickets: number };
+  daily: { tasks: DailyTaskDef[]; allDoneMinutes: number };
+}
+
+export type DailyTaskId = 'challenge' | 'pull' | 'levelup' | 'chest' | 'ads';
+
+export interface DailyTaskDef {
+  id: DailyTaskId;
+  name: string;
+  target: number;
+  tickets: number;
 }
 
 export type EquipStat = 'atk' | 'hp';

@@ -1,4 +1,5 @@
-import { Rarity, SigninReward } from '../types';
+import { emptyDaily } from '../state';
+import { DailyTaskId, Rarity, SigninReward } from '../types';
 import { Ctx } from './context';
 
 /** 本地日期 YYYY-MM-DD。MVP 用设备时间；以后有服务器再换成服务器时间。 */
@@ -13,7 +14,7 @@ export function dayKeyOf(ms: number): string {
 export function ensureDaily(ctx: Ctx): boolean {
   const key = dayKeyOf(ctx.now);
   if (ctx.s.daily.dayKey === key) return false;
-  ctx.s.daily = { dayKey: key, freeTenPullsUsed: 0, wildEncounters: 0, assistsUsed: 0 };
+  ctx.s.daily = emptyDaily(key);
   return true;
 }
 
@@ -65,4 +66,62 @@ export function claimSignin(ctx: Ctx, goldPerMin: number, expPerMin: number, cho
   }
   ctx.s.signin.lastClaimDayKey = dayKeyOf(ctx.now);
   return { reward, beastId, goldGained, expGained };
+}
+
+// ------------------------------------------------------------ 每日任务（游戏设计文档 10.3）
+
+export interface DailyTaskStatus {
+  id: DailyTaskId;
+  name: string;
+  target: number;
+  progress: number;
+  tickets: number;
+  done: boolean;
+  claimed: boolean;
+}
+
+export function addTaskProgress(ctx: Ctx, id: DailyTaskId, n = 1): void {
+  if (n <= 0) return;
+  // 跨天重置由 GameCore.resume/tick 统一做，这里不能顺手重置（否则会把当天的免费十连等计数清掉）
+  const t = ctx.s.daily.tasks;
+  t[id] = (t[id] || 0) + n;
+}
+
+export function taskStatus(ctx: Ctx): DailyTaskStatus[] {
+  const d = ctx.s.daily;
+  return ctx.idx.cfg.progression.daily.tasks.map((def) => {
+    const progress = Math.min(def.target, d.tasks[def.id] || 0);
+    return { id: def.id, name: def.name, target: def.target, progress, tickets: def.tickets, done: progress >= def.target, claimed: !!d.taskClaimed[def.id] };
+  });
+}
+
+/** 领一项任务的奖励（寻兽符）。返回得到几张，不能领返回 0。 */
+export function claimTask(ctx: Ctx, id: DailyTaskId): number {
+  const st = taskStatus(ctx).filter((x) => x.id === id)[0];
+  if (!st || !st.done || st.claimed) return 0;
+  ctx.s.daily.taskClaimed[id] = true;
+  ctx.s.tickets += st.tickets;
+  return st.tickets;
+}
+
+export function canClaimAllTasks(ctx: Ctx): boolean {
+  const list = taskStatus(ctx);
+  return !ctx.s.daily.allTasksClaimed && list.every((x) => x.done);
+}
+
+/** 全部完成的奖励：allDoneMinutes 分钟挂机量的金币和经验。 */
+export function claimAllTasks(ctx: Ctx, goldPerMin: number, expPerMin: number): { gold: number; exp: number } | null {
+  if (!canClaimAllTasks(ctx)) return null;
+  const m = ctx.idx.cfg.progression.daily.allDoneMinutes;
+  ctx.s.daily.allTasksClaimed = true;
+  const gold = m * goldPerMin;
+  const exp = m * expPerMin;
+  ctx.s.gold += gold;
+  ctx.s.exp += exp;
+  return { gold, exp };
+}
+
+/** 有可以领的任务奖励（红点用）。 */
+export function hasTaskReward(ctx: Ctx): boolean {
+  return taskStatus(ctx).some((x) => x.done && !x.claimed) || canClaimAllTasks(ctx);
 }

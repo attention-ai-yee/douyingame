@@ -4,7 +4,7 @@ import { Formulas } from './formulas';
 import { RevealSession } from './reveal/RevealSession';
 import { Rng } from './rng';
 import { createInitialState, Item, migrate, PlayerState } from './state';
-import { DepthId, GameConfig, Rarity, RevealSource } from './types';
+import { DailyTaskId, DepthId, GameConfig, Rarity, RevealSource } from './types';
 import * as collection from './systems/collection';
 import { Ctx } from './systems/context';
 import * as daily from './systems/daily';
@@ -227,6 +227,7 @@ export class GameCore {
       if (r.needsReveal) this.enqueueReveal(r.beastId, 'pull', false, r.shiny);
     }
     this.events.emit('pulled', { mountainId, results });
+    daily.addTaskProgress(ctx, 'pull', count);
     this.advanceTutorial('summon');
     return { ok: true, results };
   }
@@ -287,6 +288,7 @@ export class GameCore {
     const mult = useAssist ? stage.useAssist(ctx) : 1;
     const power = progression.teamPower(ctx) * mult;
     const win = power >= info.enemyPower;
+    daily.addTaskProgress(ctx, 'challenge');
     if (win) {
       const reward = stage.completeStage(ctx) as stage.StageReward;
       this.advanceTutorial('stage');
@@ -307,6 +309,7 @@ export class GameCore {
     const mult = useAssist ? stage.useAssist(ctx) : 1;
     const power = progression.teamPower(ctx) * mult;
     const win = power >= enemyPower;
+    daily.addTaskProgress(ctx, 'challenge');
     if (win) {
       const reward = stage.completeFloor(ctx) as stage.FloorReward;
       this.events.emit('floorCleared', { floor: this.state.floor, reward });
@@ -356,6 +359,7 @@ export class GameCore {
   levelUp(beastId: string, times = 1): number {
     const n = progression.levelUp(this.ctx(), beastId, times);
     if (n) {
+      daily.addTaskProgress(this.ctx(), 'levelup', n);
       this.events.emit('beastChanged', { beastId });
       this.advanceTutorial('upgrade');
     }
@@ -366,6 +370,7 @@ export class GameCore {
   upgradeTeam(): number {
     const n = progression.upgradeTeam(this.ctx());
     if (n) {
+      daily.addTaskProgress(this.ctx(), 'levelup', n);
       this.events.emit('teamChanged', this.state.team);
       this.advanceTutorial('upgrade');
     }
@@ -485,9 +490,38 @@ export class GameCore {
   /** 领取挂机宝箱。mult 为看广告倍数（金币、经验翻倍）。 */
   claimChest(mult = 1): idle.ChestClaim {
     const res = idle.claimChest(this.ctx(), mult);
+    if (res.gold > 0 || res.items.length || res.tickets) daily.addTaskProgress(this.ctx(), 'chest');
     this.events.emit('chestClaimed', res);
     this.advanceTutorial('chest');
     return res;
+  }
+
+  // ------------------------------------------------------------ 每日任务
+
+  dailyTasks(): daily.DailyTaskStatus[] {
+    return daily.taskStatus(this.ctx());
+  }
+
+  /** 看完一次激励视频（由广告服务回调，计入"看视频"任务）。 */
+  recordAdWatched(): void {
+    daily.addTaskProgress(this.ctx(), 'ads');
+  }
+
+  claimTask(id: DailyTaskId): number {
+    return daily.claimTask(this.ctx(), id);
+  }
+
+  canClaimAllTasks(): boolean {
+    return daily.canClaimAllTasks(this.ctx());
+  }
+
+  claimAllTasks(): { gold: number; exp: number } | null {
+    const ctx = this.ctx();
+    return daily.claimAllTasks(ctx, idle.idleGoldPerMin(ctx), idle.idleExpPerMin(ctx));
+  }
+
+  hasTaskReward(): boolean {
+    return daily.hasTaskReward(this.ctx());
   }
 
   // ------------------------------------------------------------ 新手引导

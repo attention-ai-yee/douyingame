@@ -301,6 +301,44 @@ describe('存档', () => {
   });
 });
 
+describe('每日任务', () => {
+  it('挑战、寻兽、升级、领宝箱、看视频计数；每项领寻兽符，全部完成再领金币经验；跨天重置', () => {
+    const { core, clock } = makeCore();
+    core.resume();
+    const byId = () => Object.fromEntries(core.dailyTasks().map((t) => [t.id, t]));
+    core.challengeStage();
+    core.challengeStage();
+    core.challengeStage(); // 输赢都算
+    core.pull('nanshan', 10);
+    core.state.gold = 1e6;
+    core.state.exp = 1e6;
+    core.levelUp('lei', 10);
+    clock.advance(60 * 1000);
+    core.tick();
+    core.claimChest();
+    let t = byId();
+    expect([t.challenge.done, t.pull.done, t.levelup.done, t.chest.done, t.ads.done]).toEqual([true, true, true, true, false]);
+    expect(core.hasTaskReward()).toBe(true);
+    const before = core.state.tickets;
+    for (const id of ['challenge', 'pull', 'levelup', 'chest'] as const) expect(core.claimTask(id)).toBe(1);
+    expect(core.claimTask('challenge')).toBe(0); // 不能重复领
+    expect(core.state.tickets).toBe(before + 4);
+    expect(core.canClaimAllTasks()).toBe(false);
+    for (let i = 0; i < 3; i++) core.recordAdWatched();
+    expect(core.claimTask('ads')).toBe(1);
+    const g = core.state.gold;
+    const r = core.claimAllTasks()!;
+    expect(r.gold).toBeCloseTo(core.goldPerMin() * 30, 6);
+    expect(core.state.gold).toBeCloseTo(g + r.gold, 6);
+    expect(core.claimAllTasks()).toBeNull();
+    clock.advance(DAY);
+    core.tick();
+    t = byId();
+    expect(t.challenge.progress).toBe(0);
+    expect(t.challenge.claimed).toBe(false);
+  });
+});
+
 describe('新手引导', () => {
   it('签到 → 领宝箱 → 升级 → 闯第 1 关 → 寻兽，按顺序前进；领签到后宝箱里多放一份新手奖励', () => {
     const { core } = makeCore();

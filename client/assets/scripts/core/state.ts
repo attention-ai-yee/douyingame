@@ -45,6 +45,16 @@ export interface DailyState {
   freeTenPullsUsed: number;
   wildEncounters: number;
   assistsUsed: number;
+  /** 每日任务进度（按任务 id）。 */
+  tasks: Record<string, number>;
+  /** 已领取奖励的任务。 */
+  taskClaimed: Record<string, boolean>;
+  /** 全部完成的奖励已领取。 */
+  allTasksClaimed: boolean;
+}
+
+export function emptyDaily(dayKey: string): DailyState {
+  return { dayKey, freeTenPullsUsed: 0, wildEncounters: 0, assistsUsed: 0, tasks: {}, taskClaimed: {}, allTasksClaimed: false };
 }
 
 export interface PlayerState {
@@ -121,7 +131,7 @@ export function createInitialState(now: number, seed: number, firstBeast = 'lei'
     pity: { sinceXi: 0, sinceChuanshuo: 0 },
     wildStore: 0,
     wildClockMs: 0,
-    daily: { dayKey: '', freeTenPullsUsed: 0, wildEncounters: 0, assistsUsed: 0 },
+    daily: emptyDaily(''),
     signin: { round: 0, claimedInRound: 0, lastClaimDayKey: '' },
     chest: emptyChest(),
     bag: [],

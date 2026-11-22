@@ -38,7 +38,7 @@ export class AdService {
     private readonly platform: Platform,
     private readonly cfg: AdsConfig,
     private readonly analytics: Analytics,
-    private readonly opts: { release: string; installAt: () => number },
+    private readonly opts: { release: string; installAt: () => number; onWatched?: (placement: string) => void },
   ) {
     this.state = this.load();
   }
@@ -99,6 +99,7 @@ export class AdService {
     this.save();
     if (status === 'completed') {
       this.analytics.track('ad_complete', { placement, granted: true });
+      if (this.opts.onWatched) this.opts.onWatched(placement);
       return { granted: true, ratio: 1, status };
     }
     // 无填充或加载失败：不是玩家的错，发一部分奖励

@@ -13,3 +13,4 @@ export type { StageInfo, StageReward, FloorReward } from './systems/stage';
 export type { OfflineResult, ChestClaim } from './systems/idle';
 export type { LevelCost, ResetResult } from './systems/progression';
 export type { TutorialStep } from './systems/tutorial';
+export type { DailyTaskStatus } from './systems/daily';
