@@ -1,6 +1,6 @@
-import { Color, Graphics, ImageAsset, JsonAsset, Node, resources, Sprite, SpriteFrame, UITransform } from 'cc';
+import { Color, Graphics, ImageAsset, JsonAsset, Node, resources, Sprite, SpriteFrame, TTFFont, UITransform } from 'cc';
 import { loadDirByName } from './LoadDir';
-import { hex, uiNode } from './UiKit';
+import { hex, UiFont, uiNode } from './UiKit';
 
 /**
  * 皮肤（美术素材）管理。
@@ -15,8 +15,17 @@ export class Skin {
   static insets: Record<string, number[]> = {};
   static loaded = false;
 
-  /** 启动时调用一次：读 skin.json 和 skin/ 下全部图片。 */
+  /** 启动时调用一次：读界面字体、skin.json 和 skin/ 下全部图片。 */
   static load(done: () => void): void {
+    let pending = 2;
+    const finish = () => {
+      if (--pending === 0) done();
+    };
+    resources.load('font/yushou', TTFFont, (e: Error | null, font: TTFFont | null) => {
+      if (e || !font) console.warn('[Skin] 读取字体失败，使用系统字体', e);
+      else UiFont.font = font;
+      finish();
+    });
     resources.load('skin/skin', JsonAsset, (e1: Error | null, manifest: JsonAsset | null) => {
       if (!e1 && manifest && manifest.json) {
         const imgs = (manifest.json as { images?: Record<string, { inset?: number[] }> }).images || {};
@@ -39,7 +48,7 @@ export class Skin {
         const names = Object.keys(Skin.frames);
         const beasts = names.filter((n) => n.startsWith('beast_')).length;
         console.log(`[Skin] 已加载 ${names.length} 张素材（异兽立绘 ${beasts} 张）`);
-        done();
+        finish();
       });
     });
   }

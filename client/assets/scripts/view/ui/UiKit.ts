@@ -1,4 +1,4 @@
-import { Color, Graphics, Label, Layers, Node, UITransform, view } from 'cc';
+import { Color, Graphics, Label, Layers, Node, TTFFont, UITransform, view } from 'cc';
 
 /**
  * 用代码搭界面的小工具。原型阶段界面都由代码创建，不需要在编辑器里摆节点；
@@ -6,6 +6,9 @@ import { Color, Graphics, Label, Layers, Node, UITransform, view } from 'cc';
  *
  * 注意：代码创建的节点必须放在 UI_2D 层，否则 Canvas 的 UI 摄像机看不到。
  */
+
+/** 全局界面字体（resources/font/yushou.ttf，启动时由 Skin.load 加载；没加载到就用系统字体）。 */
+export const UiFont: { font: TTFFont | null } = { font: null };
 
 export function hex(c: string, alpha = 255): Color {
   const n = parseInt(c.replace('#', ''), 16);
@@ -23,6 +26,10 @@ export function uiNode(name: string, parent: Node, x = 0, y = 0): Node {
 export function makeLabel(parent: Node, text: string, size: number, color = '#ffffff', x = 0, y = 0): Label {
   const n = uiNode('Label', parent, x, y);
   const l = n.addComponent(Label);
+  if (UiFont.font) {
+    l.useSystemFont = false;
+    l.font = UiFont.font;
+  }
   l.fontSize = size;
   l.lineHeight = Math.round(size * 1.3);
   l.color = hex(color);

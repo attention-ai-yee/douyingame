@@ -13,6 +13,9 @@
 - 原图上传到 `art/inbox/`（文件名用清单里的中文名），然后运行 `python3 tools/art/import.py`：自动去纯色背景、裁边、缩放压缩，放进 `client/assets/resources/skin/`，原图挪到 `art/originals/`。`--status` 只看进度。
 - 界面按文件名取图（`beast_jiuweihu`、`bg_battle_nanshan` 等），缺图时显示占位，换图不用改代码。
 - 立绘默认朝右。朝左的在 `beasts.json` 里加 `"facing": "left"`，战斗里我方会自动转向朝右、敌人朝左。
+- 界面字体：站酷快乐体（SIL OFL 1.1，可商用），只保留游戏里用到的字，约 130KB，在 `client/assets/resources/font/yushou.ttf`。
+  **改了界面文字或配置表后**运行 `python3 tools/art/font.py` 重新生成（需要 `pip install fonttools brotli`）；`npm test` 会检查有没有缺字。
+  字体里没有的生僻字（狌、褢、讙、鱬 等）由同一字体的部件拼成，见 `tools/art/font_synth.py`。
 
 ## 目录结构
 
