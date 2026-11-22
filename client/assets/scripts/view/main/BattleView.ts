@@ -40,6 +40,20 @@ export type BattleMode =
   | { kind: 'stage' }
   | { kind: 'tower' };
 
+/** 站位布局：单位放大倍数、整体偏移；hideBanner 时不显示左上角的关卡名（首页有自己的横幅）。 */
+export interface BattleLayout {
+  /** 单位大小倍数。 */
+  scale: number;
+  /** 站位间距倍数（横向、纵向）。 */
+  spreadX: number;
+  spreadY: number;
+  offsetX: number;
+  offsetY: number;
+  hideBanner?: boolean;
+  /** 自定义我方站位（敌人左右镜像）；不填用默认的前 2 后 3。 */
+  positions?: [number, number][];
+}
+
 export interface BattleHost {
   /** 挂机时打倒一只小怪（x、y 为战斗区域内坐标），用来播放掉落飞进宝箱。 */
   onLoot?(x: number, y: number): void;
@@ -54,12 +68,15 @@ export interface BattleHost {
  */
 @ccclass('BattleView')
 export class BattleView extends Component {
-  static create(parent: Node, w: number, h: number, x: number, y: number, mode: BattleMode, host: BattleHost): BattleView {
+  static create(parent: Node, w: number, h: number, x: number, y: number, mode: BattleMode, host: BattleHost, layout?: BattleLayout): BattleView {
     const n = uiNode('Battle', parent, x, y);
     const v = n.addComponent(BattleView);
+    if (layout) v.layout = layout;
     v.setup(w, h, mode, host);
     return v;
   }
+
+  private layout: BattleLayout = { scale: 1, spreadX: 1, spreadY: 1, offsetX: 0, offsetY: 0 };
 
   private host!: BattleHost;
   private mode: BattleMode = { kind: 'idle' };
@@ -88,6 +105,7 @@ export class BattleView extends Component {
     this.fxRoot = uiNode('Fx', this.node);
     const bannerBg = makeSprite(this.node, 'pill', 300, 52, -w / 2 + 170, h / 2 - 50, { fallback: '#fffaf0', alpha: 230 });
     this.banner = makeLabel(bannerBg, '', 24, '#4a2f27', 0, 0);
+    bannerBg.active = !this.layout.hideBanner;
     const ut = this.node.getComponent(UITransform) || this.node.addComponent(UITransform);
     ut.setContentSize(w, h);
   }
@@ -223,11 +241,15 @@ export class BattleView extends Component {
 
   private buildUnits(team: string[], enemyIds: string[], boss: boolean): void {
     for (const u of this.allies.concat(this.enemies)) u.root.destroy();
-    this.allies = team.map((id, i) => this.makeUnit(id, ALLY_POS[i][0], ALLY_POS[i][1], 1, false, 1));
+    const L = this.layout;
+    const P = L.positions || ALLY_POS;
+    const px = (x: number) => x * L.spreadX + L.offsetX;
+    const py = (y: number) => y * L.spreadY + L.offsetY;
+    this.allies = team.map((id, i) => this.makeUnit(id, px(P[i][0]), py(P[i][1]), 1, false, L.scale));
     this.enemies = enemyIds.map((id, i) => {
-      if (boss && i === 0) return this.makeUnit(id, 150, -40, -1, true, enemyIds.length === 1 ? 1.7 : 1.4);
-      const pos = ALLY_POS[boss ? i + 1 : i];
-      return this.makeUnit(id, -pos[0], pos[1], -1, true, 1);
+      if (boss && i === 0) return this.makeUnit(id, px(150), py(-40), -1, true, (enemyIds.length === 1 ? 1.7 : 1.4) * L.scale);
+      const pos = P[boss ? i + 1 : i];
+      return this.makeUnit(id, px(-pos[0]), py(pos[1]), -1, true, L.scale);
     });
   }
 
@@ -242,7 +264,7 @@ export class BattleView extends Component {
     const hpFill = makeSprite(root, enemy ? 'hp_red' : 'hp_green', HP_W - 8, 12, -(HP_W - 8) / 2, -UNIT / 2 - 20, { fallback: enemy ? '#ff5a5a' : '#3fcf7f' });
     const ut = hpFill.getComponent(UITransform);
     if (ut) ut.setAnchorPoint(0, 0.5);
-    if (!enemy && this.mode.kind !== 'idle') {
+    if (!enemy) {
       const b = App.core.state.beasts[beastId];
       if (b) makeLabel(root, `Lv.${b.level}`, 20, '#ffffff', 0, UNIT / 2 + 14);
     }
@@ -258,7 +280,7 @@ export class BattleView extends Component {
     const p = to.root.position;
     if (e.side === 'ally') {
       const txt = e.crit ? `暴击 ${formatNumber(e.dmg)}` : formatNumber(e.dmg);
-      floatText(this.fxRoot, txt, p.x + (Math.random() * 30 - 15), p.y + 50, e.crit ? 34 : 28, e.crit ? '#ff6d00' : '#fff4d6', 0.7, 55);
+      floatText(this.fxRoot, txt, p.x + (Math.random() * 30 - 15), p.y + 50 * this.layout.scale, e.crit ? 34 : 28, e.crit ? '#ff6d00' : '#fff4d6', 0.7, 55);
       if (e.killed && this.mode.kind === 'idle' && this.host.onLoot) this.host.onLoot(p.x, p.y);
     } else {
       floatText(this.fxRoot, `-${formatNumber(e.dmg)}`, p.x, p.y + 40, 22, '#e53935', 0.6, 40);
@@ -296,7 +318,10 @@ export class BattleView extends Component {
 
   private refreshBackground(): void {
     const m = App.core.idx.mountainOfChapter[this.chapterNow()];
-    const name = this.mode.kind === 'tower' ? 'bg_battle_beidongzhong' : `bg_battle_${m ? m.id : 'nanshan'}`;
+    const mid = m ? m.id : 'nanshan';
+    // 首页挂机用更高的背景（tools/art/home_bg.py 生成），没有就用战斗背景
+    let name = this.mode.kind === 'tower' ? 'bg_battle_beidongzhong' : `bg_battle_${mid}`;
+    if (this.mode.kind === 'idle' && Skin.has(`bg_home_${mid}`)) name = `bg_home_${mid}`;
     if (name === this.bgName) return;
     this.bgName = name;
     if (Skin.has(name)) {

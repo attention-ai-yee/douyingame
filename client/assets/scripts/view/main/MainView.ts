@@ -11,7 +11,8 @@ import { BeastDetail } from './BeastDetail';
 import { itemName, makeItemIcon } from './ItemIcon';
 import { GuideView, registerGuideTarget } from './GuideView';
 import { LootFly } from './LootFly';
-import { BeastsPage, BookPage, MainHooks, MorePage, MountainPage, Page, PageHost } from './Pages';
+import { MapPage } from './MapPage';
+import { BeastsPage, BookPage, MainHooks, MorePage, Page, PageHost } from './Pages';
 import { PullRevealView } from './PullRevealView';
 import { StageView } from './StageView';
 import { TasksPopup } from './TasksPopup';
@@ -46,29 +47,33 @@ export class MainView extends Component implements PageHost {
   hooks!: MainHooks;
   private W = 750;
   private H = 1334;
+  /** 顶栏（所有页签共用）。 */
+  private hudBand!: Node;
+  private avatar!: Node;
+  private avatarId = '';
   private goldL!: Label;
   private expL!: Label;
   private ticketL!: Label;
   private powerL!: Label;
+  /** 挂机页（首页）的内容。 */
+  private home!: Node;
   private stageL!: Label;
-  private stageR!: Label;
+  private stageSubL!: Label;
+  private hint!: Node;
+  private hintL!: Label;
+  private hintTab: TabKey = 'mountain';
   private signinBtn!: { node: Node; dot: Node };
   private wildBtn!: { node: Node; dot: Node; title: Label };
   private taskBtn!: { node: Node; dot: Node; title: Label };
   private chest!: Node;
+  private chestGlow!: Graphics;
   private chestBar!: Graphics;
   private chestL!: Label;
+  private chestBubble!: Node;
   private chestFullShown = false;
   private chestX = 0;
   private chestY = 0;
   private battleY = 0;
-  private team!: Node;
-  private bondL!: Label;
-  private teamSig = '';
-  private upgradeBtn!: SkinButton;
-  private equipBtn!: SkinButton;
-  private equipDot!: Node;
-  private infoL!: Label;
   private pageRoot!: Node;
   private overlay!: Node;
   private pages: Partial<Record<TabKey, Page>> = {};
@@ -79,6 +84,7 @@ export class MainView extends Component implements PageHost {
   private pullView: PullRevealView | null = null;
   private signinAutoShown = false;
   private refreshT = 1;
+  private t = 0;
 
   private setup(hooks: MainHooks): void {
     this.hooks = hooks;
@@ -88,67 +94,101 @@ export class MainView extends Component implements PageHost {
     const W = this.W;
     const top = this.H / 2;
     const bottom = -this.H / 2;
+    const tabTop = bottom + 170;
 
-    // 底图
-    if (Skin.has('bg_main')) makeSprite(this.node, 'bg_main', W, this.H);
-    else {
-      const g = uiNode('Bg', this.node).addComponent(Graphics);
-      g.fillColor = hex('#fff3dc');
-      g.rect(-W / 2, -this.H / 2, W, this.H);
-      g.fill();
+    // 底色（页签页面、加载时露出来的部分）
+    const bg = uiNode('Bg', this.node).addComponent(Graphics);
+    bg.fillColor = hex('#fff3dc');
+    bg.rect(-W / 2, -this.H / 2, W, this.H);
+    bg.fill();
+
+    // ---------------- 挂机页（首页）：战斗铺满顶栏到页签之间
+    this.home = uiNode('Home', this.node);
+    const battleH = top - tabTop;
+    this.battleY = (top + tabTop) / 2;
+    BattleView.create(this.home, W, battleH, 0, this.battleY, { kind: 'idle' }, { onLoot: (x, y) => this.onLoot(x, y) }, {
+      scale: 1.15,
+      spreadX: 1,
+      spreadY: 1,
+      offsetX: 0,
+      offsetY: 0,
+      hideBanner: true,
+      // 前排 2 只、后排 3 只错开，都在宝箱上方
+      positions: [
+        [-100, -60],
+        [-100, -250],
+        [-262, 30],
+        [-262, -155],
+        [-262, -340],
+      ],
+    });
+    // 顶部渐隐，让顶栏和横幅看得清
+    const fade = uiNode('Fade', this.home).addComponent(Graphics);
+    for (let k = 0; k < 12; k++) {
+      fade.fillColor = hex('#fff3dc', Math.round(235 * (1 - k / 12)));
+      fade.rect(-W / 2, top - 130 - k * 12, W, 12);
+      fade.fill();
     }
-
-    // 上半屏：挂机战斗
-    const battleTop = top - 170;
-    this.battleY = battleTop - 290;
-    BattleView.create(this.node, W, 580, 0, this.battleY, { kind: 'idle' }, { onLoot: (x, y) => this.onLoot(x, y) });
-
-    // 挂机宝箱（战斗区右下角）
-    this.chestX = W / 2 - 92;
-    this.chestY = this.battleY - 290 + 96;
-    this.chest = makeSprite(this.node, 'chest_box', 150, 150, this.chestX, this.chestY + 14, { fallback: '#c9773b' });
+    fade.fillColor = hex('#fff3dc', 235);
+    fade.rect(-W / 2, top - 130, W, 130);
+    fade.fill();
+    // 关卡横幅 + 下一步提示
+    const banner = makeSprite(this.home, 'banner', 420, 84, 0, top - 172, { fallback: '#fffaf0' });
+    this.stageL = makeLabel(banner, '', 30, OL, 0, 12);
+    this.stageSubL = makeLabel(banner, '', 19, '#8a6d55', 0, -20);
+    this.hint = makeSprite(this.home, 'btn_jade', 400, 50, 0, top - 246, { fallback: '#2f8f68' });
+    this.hintL = makeLabel(this.hint, '', 22, '#ffffff', 0, 3);
+    this.hint.on(Node.EventType.TOUCH_END, () => this.switchTab(this.hintTab));
+    // 左侧小图标
+    const lx = -W / 2 + 62;
+    this.signinBtn = iconButton(this.home, 'icon_signin', 88, '签到', () => this.showSignin(), lx, top - 330);
+    registerGuideTarget('signin_btn', this.signinBtn.node, 'battle');
+    this.taskBtn = iconButton(this.home, 'icon_task', 88, '任务', () => this.openTasks(), lx, top - 450);
+    this.wildBtn = iconButton(this.home, 'icon_wild', 88, '野遇', () => this.claimWild(), lx, top - 570);
+    this.wildBtn.node.active = false;
+    // 挂机宝箱：底部正中，最主要的操作
+    this.chestX = 0;
+    this.chestY = tabTop + 150;
+    this.chestGlow = uiNode('Glow', this.home, this.chestX, this.chestY).addComponent(Graphics);
+    this.chest = makeSprite(this.home, 'chest_box', 184, 184, this.chestX, this.chestY, { fallback: '#c9773b' });
     registerGuideTarget('chest', this.chest, 'battle');
     this.chest.on(Node.EventType.TOUCH_END, () => this.showChest(false));
-    const barBg = uiNode('ChestBar', this.node, this.chestX, this.chestY - 62);
-    this.chestBar = barBg.addComponent(Graphics);
-    this.chestL = makeLabel(this.node, '', 20, '#ffffff', this.chestX, this.chestY - 62);
+    this.chestBar = uiNode('ChestBar', this.home, this.chestX, this.chestY - 104).addComponent(Graphics);
+    this.chestL = makeLabel(this.home, '', 21, '#ffffff', this.chestX, this.chestY - 104);
+    this.chestBubble = makeSprite(this.home, 'pill', 150, 46, this.chestX + 150, this.chestY + 70, { fallback: '#ffffff' });
+    makeLabel(this.chestBubble, '点我领取！', 22, OL);
 
-    // 右上悬浮按钮（在战斗区的天空里）
-    this.signinBtn = iconButton(this.node, 'icon_signin', 86, '签到', () => this.showSignin(), W / 2 - 58, battleTop - 66);
-    registerGuideTarget('signin_btn', this.signinBtn.node, 'battle');
-    this.taskBtn = iconButton(this.node, 'icon_task', 86, '任务', () => this.openTasks(), W / 2 - 158, battleTop - 66);
-    this.wildBtn = iconButton(this.node, 'icon_wild', 86, '野遇', () => this.claimWild(), W / 2 - 258, battleTop - 66);
-    this.wildBtn.node.active = false;
-
-    // 上阵异兽
-    const teamY = top - 870;
-    makeSprite(this.node, 'panel_paper', W - 30, 214, 0, teamY, { fallback: '#fff8ea' });
-    const tag = makeSprite(this.node, 'pill', 150, 46, -W / 2 + 110, teamY + 104, { fallback: '#fffaf0' });
-    makeLabel(tag, '上阵异兽', 22, OL);
-    this.bondL = alignedLabel(this.node, '', 20, '#b3261e', W / 2 - 40, teamY + 104, 'right');
-    this.team = uiNode('Team', this.node, 0, teamY);
-
-    // 一键升级 / 一键穿戴
-    const upY = top - 1030;
-    this.upgradeBtn = skinButton(this.node, 'btn_red', '一键升级', 430, 112, () => this.onUpgrade(), -W / 2 + 245, upY, '');
-    registerGuideTarget('upgrade', this.upgradeBtn.node, 'battle');
-    this.equipBtn = skinButton(this.node, 'btn_gold', '一键穿戴', 240, 104, () => this.onEquipBest(), W / 2 - 145, upY);
-    this.equipDot = redDot(this.equipBtn.node, 104, 36);
-    this.infoL = makeLabel(this.node, '', 22, '#8a6d55', 0, top - 1108);
-
-    // 页签页面（盖在战斗区和阵位上）
+    // ---------------- 页签页面
     this.pageRoot = uiNode('Pages', this.node);
 
-    // 顶栏与关卡条
-    this.goldL = currencyPill(this.node, 'icon_gold', -W / 2 + 104, top - 52, 190);
-    this.expL = currencyPill(this.node, 'icon_exp', -W / 2 + 290, top - 52, 170);
-    this.ticketL = currencyPill(this.node, 'icon_ticket', W / 2 - 288, top - 52, 140);
-    this.powerL = currencyPill(this.node, 'icon_power', W / 2 - 104, top - 52, 190);
-    const bar = makeSprite(this.node, 'pill', W - 50, 60, 0, top - 128, { fallback: '#fffaf0' });
-    this.stageL = alignedLabel(bar, '', 24, OL, -(W - 50) / 2 + 28, 0, 'left');
-    this.stageR = alignedLabel(bar, '', 22, OL, (W - 50) / 2 - 28, 0, 'right');
+    // ---------------- 顶栏（所有页签共用）
+    const hud = uiNode('Hud', this.node);
+    this.hudBand = uiNode('Band', hud);
+    const band = this.hudBand.addComponent(Graphics);
+    band.fillColor = hex('#fff3dc');
+    band.rect(-W / 2, top - 120, W, 120);
+    band.fill();
+    band.fillColor = hex('#e3c999');
+    band.rect(-W / 2, top - 124, W, 4);
+    band.fill();
+    const ring = uiNode('AvatarRing', hud, -W / 2 + 68, top - 64).addComponent(Graphics);
+    ring.fillColor = hex('#fff1c2');
+    ring.circle(0, 0, 46);
+    ring.fill();
+    ring.lineWidth = 5;
+    ring.strokeColor = hex(OL);
+    ring.circle(0, 0, 46);
+    ring.stroke();
+    this.avatar = uiNode('Avatar', hud, -W / 2 + 68, top - 64);
+    alignedLabel(hud, '御兽师', 24, OL, -W / 2 + 124, top - 40, 'left');
+    const pw = makeSprite(hud, 'pill', 150, 44, -W / 2 + 196, top - 84, { fallback: '#4a2f27', color: '#4a2f27' });
+    makeSprite(pw, 'icon_power', 46, 46, -66, 2, { optional: true });
+    this.powerL = makeLabel(pw, '', 24, '#ffd84d', 12, 0);
+    this.goldL = currencyPill(hud, 'icon_gold', 10, top - 56, 170);
+    this.expL = currencyPill(hud, 'icon_exp', 186, top - 56, 150);
+    this.ticketL = currencyPill(hud, 'icon_ticket', 318, top - 56, 100);
 
-    // 底部页签
+    // ---------------- 底部页签
     makeSprite(this.node, 'tab_bar', W, 170, 0, bottom + 85, { fallback: '#fffaf0' });
     TABS.forEach((t, i) => {
       const x = (i - 2) * (W / 5);
@@ -182,6 +222,8 @@ export class MainView extends Component implements PageHost {
 
   update(dt: number): void {
     if (!App.ready) return;
+    this.t += dt;
+    this.animateChest();
     this.refreshT += dt;
     if (this.refreshT < 0.25) return;
     this.refreshT = 0;
@@ -191,27 +233,63 @@ export class MainView extends Component implements PageHost {
     setLabel(this.expL, formatNumber(s.exp));
     setLabel(this.ticketL, String(s.tickets));
     setLabel(this.powerL, formatNumber(core.teamPower()));
-    const chs = App.cfg.stages.chapters;
-    const ch = chs[Math.min(core.f.chapterOfStage(Math.max(1, s.stage)), chs.length) - 1];
-    setLabel(this.stageL, `${ch.name.split('·')[0]} · 已通关 ${s.stage} 关`);
-    setLabel(this.stageR, `挂机 金币 +${formatNumber(core.goldPerMin())}/分`);
+    this.refreshAvatar();
     if (core.fillEmptySlots()) App.save();
     this.signinBtn.dot.active = core.canClaimSignin();
     this.wildBtn.node.active = s.wildStore > 0;
     this.taskBtn.dot.active = core.hasTaskReward();
+    this.refreshHome();
     this.refreshChest();
-    this.refreshTeam();
-    this.refreshBond();
-    this.refreshUpgrade();
-    const canBeat = core.canBeatNextStage();
-    (this.tabDots.mountain as Node).active = canBeat;
-    (this.tabDots.beasts as Node).active = core.hasEquipUpgrade() || Object.keys(s.beasts).some((id) => core.canStarUp(id, true));
+    (this.tabDots.mountain as Node).active = core.canBeatNextStage();
+    (this.tabDots.beasts as Node).active = this.beastsHaveWork();
     const page = this.pages[this.current];
     if (page) page.refresh();
     if (!this.popupOpen && !this.signinAutoShown && !this.hooks.getAutoPlay() && core.canClaimSignin()) {
       this.signinAutoShown = true;
       this.showSignin();
     }
+  }
+
+  /** 异兽页有事可做：能升级、能换更好的装备、能升星。 */
+  private beastsHaveWork(): boolean {
+    const core = App.core;
+    const cost = core.nextTeamUpgradeCost();
+    if (cost && core.state.gold >= cost.gold && core.state.exp >= cost.exp) return true;
+    return core.hasEquipUpgrade() || Object.keys(core.state.beasts).some((id) => core.canStarUp(id, true));
+  }
+
+  /** 顶栏头像：上阵里战力最高的异兽。 */
+  private refreshAvatar(): void {
+    const ids = App.core.teamIds();
+    const lead = ids.slice().sort((a, b) => App.core.unitPower(b) - App.core.unitPower(a))[0] || 'lei';
+    if (lead === this.avatarId) return;
+    this.avatarId = lead;
+    for (const c of this.avatar.children.slice()) c.destroy();
+    makeBeastIcon(this.avatar, lead, 86, 0, 2, { frame: null });
+  }
+
+  /** 首页横幅：所在地图、关卡、挂机收益；下面一行提示现在最该做什么。 */
+  private refreshHome(): void {
+    const core = App.core;
+    const s = core.state;
+    const chs = App.cfg.stages.chapters;
+    const len = App.cfg.stages.chapterLength;
+    const n = Math.max(1, s.stage);
+    const chIdx = Math.min(core.f.chapterOfStage(n), chs.length);
+    const local = s.stage === 0 ? 0 : s.stage - (chIdx - 1) * len;
+    setLabel(this.stageL, `${chs[chIdx - 1].name.split('·')[0]} · ${s.stage === 0 ? '初入山海' : `第 ${local} 关`}`);
+    setLabel(this.stageSubL, `挂机中 · 金币 +${formatNumber(core.goldPerMin())}/分 · 经验 +${formatNumber(core.expPerMin())}/分`);
+    let hint = '';
+    const next = core.nextStage();
+    if (next && core.canBeatNextStage()) {
+      hint = `战力够了，去挑战第 ${next.stage - (next.chapter - 1) * len} 关 ›`;
+      this.hintTab = 'mountain';
+    } else if (this.beastsHaveWork()) {
+      hint = '异兽可以变强了，去看看 ›';
+      this.hintTab = 'beasts';
+    }
+    this.hint.active = !!hint;
+    if (hint) setLabel(this.hintL, hint);
   }
 
   // ------------------------------------------------------------ 挂机宝箱
@@ -224,20 +302,42 @@ export class MainView extends Component implements PageHost {
     const full = core.chestFull();
     if (full !== this.chestFullShown) {
       this.chestFullShown = full;
-      setSprite(this.chest, full ? 'chest_box_full' : 'chest_box', 150, 150, { fallback: '#c9773b' });
+      setSprite(this.chest, full ? 'chest_box_full' : 'chest_box', 184, 184, { fallback: '#c9773b' });
     }
     const g = this.chestBar;
-    const w = 130;
+    const w = 226;
     g.clear();
-    g.fillColor = hex('#16181d', 190);
-    g.roundRect(-w / 2, -14, w, 28, 14);
+    g.fillColor = hex('#16181d', 200);
+    g.roundRect(-w / 2, -17, w, 34, 17);
     g.fill();
+    g.lineWidth = 3;
+    g.strokeColor = hex(OL);
+    g.roundRect(-w / 2, -17, w, 34, 17);
+    g.stroke();
     if (frac > 0) {
       g.fillColor = hex(full ? '#ff7b4a' : '#ffc43d');
-      g.roundRect(-w / 2 + 3, -11, Math.max(22, (w - 6) * frac), 22, 11);
+      g.roundRect(-w / 2 + 4, -13, Math.max(26, (w - 8) * frac), 26, 13);
       g.fill();
     }
-    setLabel(this.chestL, full ? '已满！点我领取' : ms < 60000 ? '挂机中…' : formatDuration(ms));
+    const capText = `${c.capHours}时`;
+    setLabel(this.chestL, full ? '宝箱满了！快领取' : ms < 60000 ? '挂机中…' : `已攒 ${formatDuration(ms)} / ${capText}`);
+    this.chestBubble.active = full || ms >= 30 * 60000;
+  }
+
+  /** 宝箱背后的光晕（越满越亮）和气泡的轻微跳动。 */
+  private animateChest(): void {
+    if (!this.chestGlow || this.current !== 'battle') return;
+    const c = App.cfg.progression.chest;
+    const frac = Math.min(1, App.core.state.chest.ms / (c.capHours * 3600e3));
+    const g = this.chestGlow;
+    g.clear();
+    const pulse = 1 + 0.06 * Math.sin(this.t * 3);
+    for (let k = 4; k >= 1; k--) {
+      g.fillColor = hex('#fff3a8', Math.round((30 + 60 * frac) * (1 - k / 5)));
+      g.circle(0, 0, (60 + k * 16) * pulse);
+      g.fill();
+    }
+    if (this.chestBubble.active) this.chestBubble.setPosition(this.chestX + 150, this.chestY + 70 + 5 * Math.sin(this.t * 4));
   }
 
   /** 挂机打倒一只小怪：金币、经验（偶尔是装备）飞进宝箱。 */
@@ -248,20 +348,19 @@ export class MainView extends Component implements PageHost {
     const icons = ['icon_gold', 'icon_exp'];
     if (Math.random() < 0.25) icons.push(`equip_${Math.floor(Math.random() * 4)}`);
     icons.forEach((name, i) => {
-      const n = makeSprite(this.node, name, 46, 46, wx, wy, { optional: true });
-      // 放在宝箱下面一层也没关系：飞行很快，宝箱会"吞"掉它
+      const n = makeSprite(this.home, name, 46, 46, wx, wy, { optional: true });
       const f = n.addComponent(LootFly);
       f.x0 = wx + (i - 1) * 24;
       f.y0 = wy + 20;
       f.x1 = this.chestX;
-      f.y1 = this.chestY + 20;
+      f.y1 = this.chestY + 10;
       f.dur = 0.6 + i * 0.12;
       f.onArrive = () => this.bumpChest();
     });
   }
 
   private bumpChest(): void {
-    this.chest.setScale(1.12, 1.12, 1);
+    this.chest.setScale(1.1, 1.1, 1);
     this.scheduleOnce(() => this.chest.setScale(1, 1, 1), 0.08);
   }
 
@@ -331,116 +430,22 @@ export class MainView extends Component implements PageHost {
     return parts.join('　') + (equipped ? `\n自动换上了 ${equipped} 件更好的装备` : '');
   }
 
-  // ------------------------------------------------------------ 阵位与升级
-
-  private refreshTeam(): void {
-    const core = App.core;
-    const s = core.state;
-    const k = core.slotsAvailable();
-    const sig = s.team.join(',') + '|' + k + '|' + s.team.map((id) => (id && s.beasts[id] ? `${s.beasts[id].level}.${s.beasts[id].star}` : '')).join(',');
-    if (sig === this.teamSig) return;
-    this.teamSig = sig;
-    for (const c of this.team.children.slice()) c.destroy();
-    const unlocks = App.cfg.progression.slots.unlocks;
-    for (let i = 0; i < 5; i++) {
-      const x = (i - 2) * 138;
-      if (i >= k) {
-        const need = unlocks.filter((u) => u.slots > i).map((u) => u.stage)[0];
-        const lock = uiNode('Locked', this.team, x, 18);
-        const g = lock.addComponent(Graphics);
-        g.fillColor = hex('#efe7db');
-        g.circle(0, 0, 54);
-        g.fill();
-        g.lineWidth = 4;
-        g.strokeColor = hex('#c9b8a2');
-        g.circle(0, 0, 54);
-        g.stroke();
-        makeLabel(lock, need !== undefined ? `第${need}关` : '未开放', 22, '#a08a76');
-        makeLabel(this.team, '未开放', 22, '#a08a76', x, -62);
-        continue;
-      }
-      const id = s.team[i];
-      const slot = uiNode('Slot', this.team, x, 0);
-      const ut = slot.addComponent(UITransform);
-      ut.setContentSize(130, 200);
-      if (id && s.beasts[id]) {
-        makeBeastIcon(slot, id, 108, 0, 18, {});
-        makeLabel(slot, `Lv.${s.beasts[id].level}`, 24, OL, 0, -62);
-        slot.on(Node.EventType.TOUCH_END, () => this.openBeast(id));
-      } else {
-        makeLabel(slot, '空', 30, '#a08a76', 0, 18);
-        slot.on(Node.EventType.TOUCH_END, () => this.switchTab('beasts'));
-      }
-    }
-  }
-
-  /** 五行羁绊：已激活的写出来，没有时提示怎么凑。 */
-  private refreshBond(): void {
-    const sy = App.core.synergies();
-    const els = App.cfg.beasts.elements;
-    if (sy.active.length) {
-      const txt = sy.active.map((a) => {
-        const e = els[a.element as keyof typeof els];
-        return `${e.name}·${e.bond || ''}×${a.count} 战力+${Math.round(a.bonus * 100)}%`;
-      });
-      setLabel(this.bondL, '羁绊：' + txt.join('  '), '#b3261e');
-    } else setLabel(this.bondL, sy.hint || '同系 2 只上阵可激活五行羁绊', '#8a6d55');
-  }
-
-  private refreshUpgrade(): void {
-    const core = App.core;
-    const cost = core.nextTeamUpgradeCost();
-    const ok = !!cost && core.state.gold >= cost.gold && core.state.exp >= cost.exp;
-    this.upgradeBtn.setText('一键升级', cost ? `金币 ${formatNumber(cost.gold)} · 经验 ${formatNumber(cost.exp)}` : '');
-    this.upgradeBtn.setEnabled(ok);
-    const better = core.hasEquipUpgrade();
-    this.equipDot.active = better;
-    let info: string;
-    if (core.chestFull()) info = '挂机宝箱满了，快点宝箱领取！';
-    else if (core.canBeatNextStage()) {
-      const n = core.nextStage();
-      info = n ? `战力够了，去「进山」挑战第 ${n.stage - (n.chapter - 1) * App.cfg.stages.chapterLength} 关吧` : '';
-    } else if (ok) info = '金币经验够了，点「一键升级」变强！';
-    else if (better) info = '背包里有更好的装备，点「一键穿戴」';
-    else info = '挂机产出都在宝箱里，点宝箱领取 · 离线也在攒';
-    setLabel(this.infoL, info);
-  }
-
-  private onUpgrade(): void {
-    const n = App.core.upgradeTeam();
-    if (n <= 0) {
-      this.toast('金币或经验不够，挂机攒一会再领宝箱');
-      return;
-    }
-    App.analytics.track('team_level_up', { levels: n });
-    App.save();
-    floatText(this.node, `升了 ${n} 级！`, -this.W / 2 + 245, this.H / 2 - 960, 32, '#ff5a5a', 0.9, 50);
-    this.teamSig = '';
-  }
-
-  private onEquipBest(): void {
-    const n = App.core.equipBest();
-    if (!n) {
-      this.toast(App.core.state.bag.length ? '已经穿着最好的装备了' : '还没有装备，挂机宝箱和 Boss 关会掉');
-      return;
-    }
-    App.save();
-    this.toast(`换上了 ${n} 件更好的装备`);
-  }
-
   // ------------------------------------------------------------ 页签
 
   switchTab(k: TabKey): void {
     this.current = k;
     const W = this.W;
-    const pageH = this.H - 335;
-    const pageY = (this.H / 2 - 170 + (-this.H / 2 + 165)) / 2;
+    // 页面占满顶栏（120）和页签（170）之间
+    const pageH = this.H - 290;
+    const pageY = (this.H / 2 - 120 + (-this.H / 2 + 170)) / 2;
+    this.home.active = k === 'battle';
+    this.hudBand.active = k !== 'battle';
     if (k !== 'battle' && !this.pages[k]) {
       const make: Record<Exclude<TabKey, 'battle'>, () => Page> = {
-        beasts: () => new BeastsPage(this, this.pageRoot, W - 24, pageH, pageY),
-        mountain: () => new MountainPage(this, this.pageRoot, W - 24, pageH, pageY),
-        book: () => new BookPage(this, this.pageRoot, W - 24, pageH, pageY),
-        more: () => new MorePage(this, this.pageRoot, W - 24, pageH, pageY),
+        beasts: () => new BeastsPage(this, this.pageRoot, W, pageH, pageY),
+        mountain: () => new MapPage(this, this.pageRoot, W, pageH, pageY),
+        book: () => new BookPage(this, this.pageRoot, W, pageH, pageY),
+        more: () => new MorePage(this, this.pageRoot, W, pageH, pageY),
       };
       this.pages[k] = make[k as Exclude<TabKey, 'battle'>]();
     }
@@ -471,7 +476,6 @@ export class MainView extends Component implements PageHost {
     this.popupOpen = true;
     BeastDetail.open(this.overlay, id, (t) => this.toast(t), () => {
       this.popupOpen = false;
-      this.teamSig = '';
     });
   }
 

@@ -38,12 +38,11 @@ const STEP_TARGETS: Record<TutorialStep, [string, string][]> = {
     ['tab_battle', '回到挂机页领取宝箱'],
   ],
   upgrade: [
-    ['upgrade', '金币和经验够了\n点「一键升级」让异兽变强'],
-    ['tab_battle', '回到挂机页给异兽升级'],
+    ['beasts_upgrade', '金币和经验够了\n点「一键升级」让异兽变强'],
+    ['tab_beasts', '去「异兽」页给异兽升级'],
   ],
   stage: [
     ['stage_challenge', '挑战第 1 关！'],
-    ['map_enter_1', '从南山开始闯关'],
     ['tab_mountain', '变强了！去「进山」闯关'],
   ],
   summon: [

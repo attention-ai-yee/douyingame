@@ -96,6 +96,30 @@ const equipIcon = (k) => {
 const bag = () => svg(112, 112, `<path d="M40,30 Q56,14 72,30" fill="none" stroke="${OL}" stroke-width="7" stroke-linecap="round"/>
   <path d="M24,44 Q24,32 36,32 L76,32 Q88,32 88,44 L94,90 Q94,100 84,100 L28,100 Q18,100 18,90 Z" fill="#c9773b" stroke="${OL}" stroke-width="${SW}" stroke-linejoin="round"/>
   <rect x="44" y="52" width="24" height="18" rx="5" fill="#ffd84d" stroke="${OL}" stroke-width="4"/><ellipse cx="38" cy="46" rx="9" ry="4" fill="#fff" opacity="0.5"/>`);
+/** 卡片（九宫格）：白底 + 棕色描边 + 内侧细线；dim 为未开放的灰卡。 */
+const card = (dim) => svg(120, 120, `<rect x="4" y="8" width="112" height="108" rx="24" fill="${OL}" opacity="0.25"/>
+  <rect x="4" y="4" width="112" height="108" rx="24" fill="${dim ? '#ece4d8' : '#ffffff'}" stroke="${OL}" stroke-width="4"/>
+  <rect x="12" y="12" width="96" height="92" rx="17" fill="none" stroke="${dim ? '#d3c7b6' : '#f0c98f'}" stroke-width="2.5"/>`);
+/** 横幅（九宫格）：奶油色底 + 金边。 */
+const banner = () => svg(160, 90, `<rect x="4" y="9" width="152" height="77" rx="18" fill="${OL}" opacity="0.35"/>
+  <rect x="4" y="4" width="152" height="77" rx="18" fill="#fffaf0" stroke="${OL}" stroke-width="5"/>
+  <rect x="12" y="11" width="136" height="63" rx="12" fill="none" stroke="#f0c98f" stroke-width="3"/>`);
+/** 地图关卡点：已通关（金）、下一关（红）、未开放（灰）。 */
+const mapNode = (kind) => {
+  const c = { done: ['#fff3b0', '#ffc43d', '#e8a317', OL], next: ['#ffb3a6', '#ff5a5a', '#d93f3f', OL], lock: ['#f6f1ea', '#d8cfc2', '#c4b8a8', '#8a7a68'] }[kind];
+  return svg(100, 100, `<radialGradient id="n" cx="0.36" cy="0.3" r="0.8"><stop offset="0" stop-color="${c[0]}"/><stop offset="0.6" stop-color="${c[1]}"/><stop offset="1" stop-color="${c[2]}"/></radialGradient>
+    <circle cx="50" cy="56" r="42" fill="${OL}" opacity="0.35"/><circle cx="50" cy="50" r="42" fill="url(#n)" stroke="${c[3]}" stroke-width="5"/>
+    <ellipse cx="36" cy="30" rx="11" ry="6" fill="#fff" opacity="0.6" transform="rotate(-30 36 30)"/>`);
+};
+const checkBadge = () => svg(48, 48, `<circle cx="24" cy="24" r="20" fill="#3fcf7f" stroke="#2a7a52" stroke-width="4"/><path d="M14,25 L21,32 L34,17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`);
+const lockIcon = () => svg(64, 64, `<path d="M20,30 L20,22 Q20,10 32,10 Q44,10 44,22 L44,30" fill="none" stroke="${OL}" stroke-width="6"/><rect x="12" y="28" width="40" height="30" rx="7" fill="#ffc43d" stroke="${OL}" stroke-width="4"/><circle cx="32" cy="42" r="4" fill="${OL}"/>`);
+const mapTree = (c1, c2) => svg(80, 100, `<rect x="34" y="58" width="12" height="34" rx="5" fill="#9a6b45" stroke="${OL}" stroke-width="3.5"/>
+  <circle cx="40" cy="42" r="32" fill="${c1}" stroke="${OL}" stroke-width="3.5"/><circle cx="30" cy="32" r="10" fill="${c2}"/>`);
+const mapPeak = (c) => svg(220, 150, `<path d="M6,144 L110,10 L214,144 Z" fill="${c}" stroke="${OL}" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M82,46 L110,10 L138,46 L124,52 L110,40 L96,54 Z" fill="#fff" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/>`);
+const mapCloud = () => svg(160, 80, `<g opacity="0.92"><ellipse cx="82" cy="52" rx="66" ry="24" fill="#fff"/><ellipse cx="50" cy="38" rx="32" ry="24" fill="#fff"/><ellipse cx="98" cy="30" rx="38" ry="28" fill="#fff"/></g>`);
+const mapHouse = () => svg(120, 100, `<rect x="26" y="44" width="68" height="48" fill="#e8964f" stroke="${OL}" stroke-width="4"/>
+  <path d="M8,48 L60,10 L112,48 Z" fill="#c0392b" stroke="${OL}" stroke-width="4" stroke-linejoin="round"/><rect x="50" y="62" width="20" height="30" fill="${OL}"/>`);
 /** 圆形彩色图标底 + 白字（右侧悬浮按钮）。 */
 const roundIcon = (bg, ch) => svg(112, 112, `<circle cx="56" cy="62" r="46" fill="${OL}"/><circle cx="56" cy="56" r="46" fill="${bg}" stroke="${OL}" stroke-width="${SW}"/>
   <ellipse cx="36" cy="34" rx="11" ry="6" fill="#fff" opacity="0.5" transform="rotate(-30 36 34)"/>
@@ -131,6 +155,18 @@ add('chest_box', chestBox(false));
 add('chest_box_full', chestBox(true));
 for (let k = 0; k < 4; k++) add(`equip_${k}`, equipIcon(k));
 add('icon_bag', bag());
+add('card', card(false), { inset: [36, 36, 36, 36] });
+add('card_dim', card(true), { inset: [36, 36, 36, 36] });
+add('banner', banner(), { inset: [30, 28, 30, 28] });
+for (const k of ['done', 'next', 'lock']) add(`node_${k}`, mapNode(k));
+add('badge_check', checkBadge());
+add('icon_lock', lockIcon());
+add('map_tree', mapTree('#7cc47a', '#a6e09b'));
+add('map_tree_autumn', mapTree('#f0a04b', '#ffd08a'));
+add('map_tree_snow', mapTree('#9cc6d8', '#ffffff'));
+add('map_peak', mapPeak('#a9c7d8'));
+add('map_cloud', mapCloud());
+add('map_house', mapHouse());
 add('icon_signin', roundIcon('#ff7b7b', '签'));
 add('icon_task', roundIcon('#7cc4ff', '任'));
 add('icon_chest', roundIcon('#ffc43d', '宝'));

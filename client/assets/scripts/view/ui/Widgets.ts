@@ -55,9 +55,9 @@ export function skinButton(
 
 /** 顶栏的货币条：底板 + 左侧图标 + 数字。 */
 export function currencyPill(parent: Node, icon: string, x: number, y: number, w = 220): Label {
-  const n = makeSprite(parent, 'pill', w, 60, x, y, { fallback: '#16181d', alpha: 210 });
-  makeSprite(n, icon, 56, 56, -w / 2 + 30, 0, { fallback: '#c9a227' });
-  const l = makeLabel(n, '0', 28, '#4a2f27', 18, 0);
+  const n = makeSprite(parent, 'pill', w, 56, x, y, { fallback: '#fffaf0' });
+  makeSprite(n, icon, 58, 58, -w / 2 + 24, 2, { fallback: '#c9a227' });
+  const l = makeLabel(n, '0', 26, '#4a2f27', 26, 0);
   return l;
 }
 
@@ -79,11 +79,12 @@ export function redDot(parent: Node, x: number, y: number): Node {
 export function iconButton(parent: Node, icon: string, size: number, title: string, onTap: () => void, x: number, y: number): { node: Node; dot: Node; title: Label } {
   const n = makeSprite(parent, icon, size, size, x, y, { fallback: '#b3261e' });
   n.on(Node.EventType.TOUCH_END, onTap);
-  const t = makeLabel(n, title, 20, '#fff4d6', 0, -size / 2 - 6);
-  const bg = t.node.addComponent(Graphics);
+  // 底板和文字分两个节点：Cocos 一个节点只能有一个渲染组件（Label / Sprite / Graphics 三选一）
+  const bg = uiNode('TitleBg', n, 0, -size / 2 - 6).addComponent(Graphics);
   bg.fillColor = hex('#16181d', 170);
-  bg.roundRect(-34, -13, 68, 26, 13);
+  bg.roundRect(-36, -14, 72, 28, 14);
   bg.fill();
+  const t = makeLabel(n, title, 20, '#fff4d6', 0, -size / 2 - 6);
   const dot = redDot(n, size / 2 - 10, size / 2 - 10);
   dot.active = false;
   return { node: n, dot, title: t };

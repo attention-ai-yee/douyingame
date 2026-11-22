@@ -33,28 +33,17 @@ export interface Page {
   refresh(): void;
 }
 
-/** 页面底板：宣纸面板 + 标题，吃掉点击（避免点到下面的战斗区）。 */
+/** 页面底板：整页宣纸（左右边框藏在屏幕外），吃掉点击（避免点到下面的战斗区）。 */
 function pageFrame(parent: Node, w: number, h: number, y: number, title: string): { root: Node; title: Label } {
-  const root = makeSprite(parent, 'panel_paper', w, h, 0, y, { fallback: '#fff8ea' });
+  const root = makeSprite(parent, 'panel_paper', w + 60, h + 40, 0, y, { fallback: '#fff8ea' });
   root.on(Node.EventType.TOUCH_START, () => undefined);
   const t = makeLabel(root, title, 36, OL, 0, h / 2 - 50);
   return { root, title: t };
 }
 
-/** 简单的圆角卡片背景。 */
-function card(parent: Node, w: number, h: number, x: number, y: number, fill = '#ffffff', stroke = OL): Node {
-  const n = uiNode('Card', parent, x, y);
-  const g = n.addComponent(Graphics);
-  g.fillColor = hex(fill);
-  g.roundRect(-w / 2, -h / 2, w, h, 22);
-  g.fill();
-  g.lineWidth = 4;
-  g.strokeColor = hex(stroke);
-  g.roundRect(-w / 2, -h / 2, w, h, 22);
-  g.stroke();
-  const ut = n.getComponent(UITransform) || n.addComponent(UITransform);
-  ut.setContentSize(w, h);
-  return n;
+/** 统一的卡片（card 皮肤，九宫格拉伸）；dim 为未开放的灰卡。 */
+function card(parent: Node, w: number, h: number, x: number, y: number, dim = false): Node {
+  return makeSprite(parent, dim ? 'card_dim' : 'card', w, h, x, y, { fallback: dim ? '#ece4d8' : '#ffffff' });
 }
 
 /** 页面顶部的分页切换（例如"我的异兽 / 寻兽"）：选中的用红色按钮，其余用灰色。 */
@@ -88,6 +77,10 @@ export class BeastsPage implements Page {
   private sig = '';
   private bagBtn: SkinButton;
   private bagDot: Node;
+  private upBtn: SkinButton;
+  private equipBtn: SkinButton;
+  private equipDot: Node;
+  private bondL: Label;
   // 寻兽
   private ticketsL: Label;
   private pityL: Label;
@@ -102,15 +95,22 @@ export class BeastsPage implements Page {
     registerGuideTarget('seg_summon', this.seg.nodes[1], 'beasts');
     // 我的异兽
     this.mine = uiNode('Mine', this.node);
-    const hy = h / 2 - 140;
-    this.bagBtn = skinButton(this.mine, 'btn_gold', '装备背包', 230, 72, () => this.host.openBag(), -w / 2 + 145, hy);
-    this.bagDot = redDot(this.bagBtn.node, 100, 28);
-    skinButton(this.mine, 'btn_ink', '上阵最强', 230, 72, () => {
+    // 第一排：一键升级（上阵异兽）、一键穿戴
+    const hy = h / 2 - 146;
+    this.upBtn = skinButton(this.mine, 'btn_red', '一键升级', 330, 96, () => this.onUpgrade(), -w / 2 + 196, hy, '');
+    registerGuideTarget('beasts_upgrade', this.upBtn.node, 'beasts');
+    this.equipBtn = skinButton(this.mine, 'btn_gold', '一键穿戴', 300, 96, () => this.onEquipBest(), w / 2 - 180, hy);
+    this.equipDot = redDot(this.equipBtn.node, 136, 34);
+    // 第二排：上阵最强、装备背包、羁绊
+    const ry = hy - 86;
+    skinButton(this.mine, 'btn_ink', '上阵最强', 200, 64, () => {
       App.core.autoTeam();
       App.save();
       this.host.toast('已上阵战力最高的异兽');
-    }, w / 2 - 145, hy);
-    makeLabel(this.mine, '点异兽可以升级、升星、换装备', 20, '#a08a76', 0, hy - 56);
+    }, -w / 2 + 130, ry);
+    this.bagBtn = skinButton(this.mine, 'btn_ink', '装备背包', 200, 64, () => this.host.openBag(), -w / 2 + 340, ry);
+    this.bagDot = redDot(this.bagBtn.node, 90, 22);
+    this.bondL = alignedLabel(this.mine, '', 20, '#b3261e', w / 2 - 26, ry, 'right');
     this.grid = uiNode('Grid', this.mine);
     // 寻兽
     this.summon = uiNode('Summon', this.node);
@@ -145,7 +145,19 @@ export class BeastsPage implements Page {
     const core = App.core;
     const s = core.state;
     this.bagBtn.setText(`装备背包 ${s.bag.length}`);
-    this.bagDot.active = core.hasEquipUpgrade();
+    const better = core.hasEquipUpgrade();
+    this.bagDot.active = false;
+    this.equipDot.active = better;
+    const cost = core.nextTeamUpgradeCost();
+    const canUp = !!cost && s.gold >= cost.gold && s.exp >= cost.exp;
+    this.upBtn.setText('一键升级', cost ? `金币 ${formatNumber(cost.gold)} · 经验 ${formatNumber(cost.exp)}` : '');
+    this.upBtn.setEnabled(canUp);
+    this.equipBtn.setEnabled(better);
+    const sy = core.synergies();
+    const els = App.cfg.beasts.elements;
+    if (sy.active.length) {
+      setLabel(this.bondL, '羁绊 ' + sy.active.map((a) => `${els[a.element as keyof typeof els].name}·${els[a.element as keyof typeof els].bond || ''}×${a.count}`).join(' '), '#b3261e');
+    } else setLabel(this.bondL, sy.hint ? sy.hint.replace('可激活', '激活') : '同系 2 只上阵激活羁绊', '#8a6d55');
     const sig = Object.keys(s.beasts)
       .map((id) => `${id}:${s.beasts[id].star}:${s.beasts[id].shards}:${s.beasts[id].level}`)
       .join('|') + JSON.stringify(s.wildShards) + s.team.join(',') + Math.floor(s.gold) + Math.floor(s.exp);
@@ -156,8 +168,8 @@ export class BeastsPage implements Page {
     const ids = Object.keys(s.beasts).sort((a, b) => core.unitPower(b) - core.unitPower(a));
     const cols = 5;
     const cw = (this.w - 40) / cols;
-    const ch = 196;
-    const top = this.h / 2 - 250;
+    const ch = 188;
+    const top = this.h / 2 - 350;
     ids.forEach((id, i) => {
       const x = -this.w / 2 + 20 + cw * (i % cols) + cw / 2;
       const y = top - Math.floor(i / cols) * ch;
@@ -198,7 +210,7 @@ export class BeastsPage implements Page {
     const start = this.h / 2 - 330;
     core.mountains().forEach((m, i) => {
       const y = start - i * (chh + 18);
-      const c = card(this.cards, cw, chh, 0, y, m.unlocked ? '#ffffff' : '#ece4d8');
+      const c = card(this.cards, cw, chh, 0, y, !m.unlocked);
       alignedLabel(c, m.name, 36, OL, -cw / 2 + 30, chh / 2 - 44, 'left');
       const def = App.cfg.pools.mountains[i];
       const rare = def.tiers.chuanshuo.concat(def.tiers.xi).map((x) => x[0]).filter((v, k, a) => a.indexOf(v) === k).slice(0, 3);
@@ -218,6 +230,27 @@ export class BeastsPage implements Page {
     });
   }
 
+  private onUpgrade(): void {
+    const n = App.core.upgradeTeam();
+    if (n <= 0) {
+      this.host.toast('金币或经验不够，回挂机页领宝箱');
+      return;
+    }
+    App.analytics.track('team_level_up', { levels: n });
+    App.save();
+    this.host.toast(`上阵异兽一共升了 ${n} 级！`);
+  }
+
+  private onEquipBest(): void {
+    const n = App.core.equipBest();
+    if (!n) {
+      this.host.toast(App.core.state.bag.length ? '已经穿着最好的装备了' : '还没有装备，挂机宝箱和 Boss 关会掉');
+      return;
+    }
+    App.save();
+    this.host.toast(`换上了 ${n} 件更好的装备`);
+  }
+
   private async onAdTickets(): Promise<void> {
     const n = App.cfg.ads.rewarded.tickets.tickets || 5;
     const r = await App.ads.showRewarded('tickets');
@@ -229,127 +262,6 @@ export class BeastsPage implements Page {
     App.core.grantTickets(got);
     App.save();
     this.host.toast(`获得寻兽符 ×${got}`);
-  }
-}
-
-// ------------------------------------------------------------ 进山（选地图 → 关卡 → 闯关）
-
-export class MountainPage implements Page {
-  node: Node;
-  private title: Label;
-  private body: Node;
-  private chapter = 0; // 0 = 地图列表
-  private sig = '';
-
-  constructor(private host: PageHost, parent: Node, private w: number, private h: number, y: number) {
-    const f = pageFrame(parent, w, h, y, '进山闯关');
-    this.node = f.root;
-    this.title = f.title;
-    this.body = uiNode('Body', this.node);
-  }
-
-  refresh(): void {
-    const core = App.core;
-    const sig = `${this.chapter}|${core.state.stage}|${core.state.floor}|${Math.round(core.teamPower())}`;
-    if (sig === this.sig) return;
-    this.sig = sig;
-    this.body.destroy();
-    this.body = uiNode('Body', this.node);
-    if (this.chapter) this.buildStages(this.chapter);
-    else this.buildMaps();
-  }
-
-  private open(ch: number): void {
-    this.chapter = ch;
-    this.sig = '';
-    this.refresh();
-  }
-
-  private buildMaps(): void {
-    const core = App.core;
-    const len = App.cfg.stages.chapterLength;
-    setLabel(this.title, '进山闯关');
-    makeLabel(this.body, '选一座山，一关一关打过去。打得越远，挂机收益越高', 22, '#8a6d55', 0, this.h / 2 - 100);
-    const cw = this.w - 60;
-    const chh = 196;
-    const start = this.h / 2 - 230;
-    App.cfg.stages.chapters.forEach((ch, i) => {
-      const y = start - i * (chh + 16);
-      const from = (ch.id - 1) * len;
-      const unlocked = core.state.stage >= from;
-      const cleared = Math.max(0, Math.min(len, core.state.stage - from));
-      const c = card(this.body, cw, chh, 0, y, unlocked ? '#ffffff' : '#ece4d8');
-      const bg = `bg_battle_${ch.mountain}`;
-      if (Skin.has(bg)) makeSprite(c, bg, cw - 12, chh - 12, 0, 0, { color: unlocked ? '#ffffff' : '#9a9088' });
-      const nameBg = makeSprite(c, 'pill', 330, 60, -cw / 2 + 190, chh / 2 - 44, { fallback: '#fffaf0', alpha: 235 });
-      makeLabel(nameBg, ch.name, 28, OL);
-      const info = makeSprite(c, 'pill', 330, 50, -cw / 2 + 190, -chh / 2 + 40, { fallback: '#fffaf0', alpha: 235 });
-      makeLabel(info, unlocked ? `已通关 ${cleared}/${len} · Boss ${ch.boss.name}` : `打通上一座山后开放`, 20, OL);
-      if (unlocked) {
-        const done = cleared >= len;
-        const b = skinButton(c, done ? 'btn_jade' : 'btn_red', done ? '已通关' : '进入', 200, 84, () => this.open(ch.id), cw / 2 - 130, -20);
-        registerGuideTarget(`map_enter_${ch.id}`, b.node, 'mountain');
-        if (!done && core.canBeatNextStage() && core.f.chapterOfStage(core.state.stage + 1) === ch.id) redDot(b.node, 90, 32);
-      }
-    });
-    // 镇妖塔
-    const ty = start - App.cfg.stages.chapters.length * (chh + 16) + 30;
-    const t = card(this.body, cw, 130, 0, ty, core.towerUnlocked() ? '#fff1c2' : '#ece4d8');
-    alignedLabel(t, '镇妖塔', 32, OL, -cw / 2 + 30, 22, 'left');
-    if (core.towerUnlocked()) {
-      alignedLabel(t, `已镇压 ${core.state.floor} 层 · 下一层敌方 ${formatNumber(core.nextFloorPower())}`, 20, '#6b5444', -cw / 2 + 30, -26, 'left');
-      skinButton(t, 'btn_red', '挑战', 180, 80, () => this.host.openStage('tower'), cw / 2 - 120, 0);
-    } else {
-      alignedLabel(t, `打通南山经（第 ${App.cfg.stages.tower.unlockStage} 关）后开放`, 20, '#6b5444', -cw / 2 + 30, -26, 'left');
-    }
-  }
-
-  private buildStages(chId: number): void {
-    const core = App.core;
-    const len = App.cfg.stages.chapterLength;
-    const ch = App.cfg.stages.chapters[chId - 1];
-    const from = (chId - 1) * len;
-    const cleared = Math.max(0, Math.min(len, core.state.stage - from));
-    setLabel(this.title, ch.name);
-    skinButton(this.body, 'btn_ink', '‹ 返回', 150, 64, () => this.open(0), -this.w / 2 + 100, this.h / 2 - 50);
-    makeLabel(this.body, `已通关 ${cleared}/${len}　·　我方战力 ${formatNumber(core.teamPower())}`, 22, '#8a6d55', 0, this.h / 2 - 108);
-    const cols = 5;
-    const cw = (this.w - 60) / cols;
-    const rowH = 86;
-    const top = this.h / 2 - 165;
-    for (let k = 1; k <= len; k++) {
-      const n = from + k;
-      const x = -this.w / 2 + 30 + cw * ((k - 1) % cols) + cw / 2;
-      const y = top - Math.floor((k - 1) / cols) * rowH;
-      const done = n <= core.state.stage;
-      const isNext = n === core.state.stage + 1;
-      const boss = core.f.isChapterBoss(n) || core.f.isSmallBoss(n);
-      const r = boss ? 40 : 34;
-      const node = uiNode('Stage', this.body, x, y);
-      const g = node.addComponent(Graphics);
-      g.fillColor = hex(done ? '#8fdcae' : isNext ? '#ff7b7b' : '#e5ddd2');
-      g.circle(0, 0, r);
-      g.fill();
-      g.lineWidth = isNext ? 6 : 4;
-      g.strokeColor = hex(isNext ? '#b3261e' : done ? '#2f8f68' : '#c9b8a2');
-      g.circle(0, 0, r);
-      g.stroke();
-      makeLabel(node, done ? `✓${k}` : `${k}`, boss ? 28 : 26, done || isNext ? '#ffffff' : '#a08a76', 0, 2);
-      if (boss) makeLabel(this.body, core.f.isChapterBoss(n) ? ch.boss.name : '小 Boss', 18, '#b3261e', x, y - r - 10);
-      if (isNext) {
-        const ut = node.addComponent(UITransform);
-        ut.setContentSize(cw, rowH);
-        node.on(Node.EventType.TOUCH_END, () => this.host.openStage('stage'));
-      }
-    }
-    const next = core.nextStage();
-    if (next && next.chapter === chId) {
-      const ok = core.teamPower() >= next.enemyPower;
-      const by = -this.h / 2 + 70;
-      makeLabel(this.body, `第 ${next.stage - from} 关 敌方战力 ${formatNumber(next.enemyPower)}${ok ? '' : '（还差一点，先去升级）'}`, 22, ok ? '#2f8f68' : '#b3261e', 0, by + 64);
-      const go = skinButton(this.body, 'btn_red', `挑战第 ${next.stage - from} 关`, 320, 92, () => this.host.openStage('stage'), 0, by);
-      registerGuideTarget('stage_challenge', go.node, 'mountain');
-    }
   }
 }
 
