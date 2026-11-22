@@ -78,6 +78,7 @@ export class MainView extends Component implements PageHost {
   private overlay!: Node;
   private pages: Partial<Record<TabKey, Page>> = {};
   private tabIcons: Partial<Record<TabKey, Node>> = {};
+  private tabHighlight!: Node;
   private tabDots: Partial<Record<TabKey, Node>> = {};
   private current: TabKey = 'battle';
   private popupOpen = false;
@@ -96,11 +97,8 @@ export class MainView extends Component implements PageHost {
     const bottom = -this.H / 2;
     const tabTop = bottom + 170;
 
-    // 底色（页签页面、加载时露出来的部分）
-    const bg = uiNode('Bg', this.node).addComponent(Graphics);
-    bg.fillColor = hex('#fff3dc');
-    bg.rect(-W / 2, -this.H / 2, W, this.H);
-    bg.fill();
+    // 页签之间露出的底图。
+    makeSprite(this.node, 'bg_main', W, this.H, 0, 0, { fallback: '#fff3dc' });
 
     // ---------------- 挂机页（首页）：战斗铺满顶栏到页签之间
     this.home = uiNode('Home', this.node);
@@ -190,9 +188,18 @@ export class MainView extends Component implements PageHost {
 
     // ---------------- 底部页签
     makeSprite(this.node, 'tab_bar', W, 170, 0, bottom + 85, { fallback: '#fffaf0' });
+    this.tabHighlight = uiNode('SelectedTab', this.node, 0, bottom + 90);
+    const highlight = this.tabHighlight.addComponent(Graphics);
+    highlight.fillColor = hex('#c8ded2', 200);
+    highlight.roundRect(-64, -65, 128, 133, 24);
+    highlight.fill();
+    highlight.fillColor = hex('#497b67');
+    highlight.roundRect(-17, 55, 34, 5, 2);
+    highlight.fill();
     TABS.forEach((t, i) => {
       const x = (i - 2) * (W / 5);
-      const icon = makeSprite(this.node, `tab_${t.key}_off`, 100, 100, x, bottom + 104, { fallback: '#d9cfc2' });
+      const nav = `nav_${t.key}`;
+      const icon = makeSprite(this.node, Skin.has(nav) ? nav : `tab_${t.key}_off`, 100, 100, x, bottom + 104, { fallback: '#d9cfc2' });
       icon.on(Node.EventType.TOUCH_END, () => this.switchTab(t.key));
       makeLabel(this.node, t.name, 24, OL, x, bottom + 34);
       this.tabIcons[t.key] = icon;
@@ -455,13 +462,19 @@ export class MainView extends Component implements PageHost {
     }
     const page = this.pages[k];
     if (page) page.refresh();
+    this.tabHighlight.setPosition((TABS.findIndex((tab) => tab.key === k) - 2) * (W / 5), -this.H / 2 + 90);
     TABS.forEach((t, i) => {
       const icon = this.tabIcons[t.key];
       if (!icon) return;
       const on = t.key === k;
-      const size = on ? 116 : 100;
-      setSprite(icon, `tab_${t.key}_${on ? 'on' : 'off'}`, size, size, { fallback: on ? '#ff7b7b' : '#d9cfc2' });
-      icon.setPosition((i - 2) * (W / 5), -this.H / 2 + (on ? 116 : 104));
+      const nav = `nav_${t.key}`;
+      const painted = Skin.has(nav);
+      const size = painted ? (on ? 92 : 84) : (on ? 116 : 100);
+      setSprite(icon, painted ? nav : `tab_${t.key}_${on ? 'on' : 'off'}`, size, size, {
+        fallback: on ? '#ff7b7b' : '#d9cfc2',
+        color: painted && !on ? '#d3c6b6' : undefined,
+      });
+      icon.setPosition((i - 2) * (W / 5), -this.H / 2 + (on ? 110 : 104));
     });
   }
 

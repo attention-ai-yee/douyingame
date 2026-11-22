@@ -211,6 +211,7 @@ export class BeastsPage implements Page {
     core.mountains().forEach((m, i) => {
       const y = start - i * (chh + 18);
       const c = card(this.cards, cw, chh, 0, y, !m.unlocked);
+      makeSprite(c, `bg_mountain_${m.id}`, cw - 16, chh - 16, 0, 0, { optional: true, alpha: m.unlocked ? 85 : 48 });
       alignedLabel(c, m.name, 36, OL, -cw / 2 + 30, chh / 2 - 44, 'left');
       const def = App.cfg.pools.mountains[i];
       const rare = def.tiers.chuanshuo.concat(def.tiers.xi).map((x) => x[0]).filter((v, k, a) => a.indexOf(v) === k).slice(0, 3);

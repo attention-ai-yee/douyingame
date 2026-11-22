@@ -1,4 +1,4 @@
-import { Color, Graphics, ImageAsset, JsonAsset, Node, resources, Sprite, SpriteFrame, TTFFont, UITransform } from 'cc';
+import { Color, Graphics, ImageAsset, JsonAsset, Node, Rect, resources, Size, Sprite, SpriteFrame, TTFFont, UITransform } from 'cc';
 import { loadDirByName } from './LoadDir';
 import { hex, UiFont, uiNode } from './UiKit';
 
@@ -14,6 +14,7 @@ export class Skin {
   static frames: Record<string, SpriteFrame> = {};
   static insets: Record<string, number[]> = {};
   static loaded = false;
+  private static battleClips: Record<string, SpriteFrame[]> = {};
 
   /** 启动时调用一次：读界面字体、skin.json 和 skin/ 下全部图片。 */
   static load(done: () => void): void {
@@ -55,6 +56,26 @@ export class Skin {
 
   static has(name: string): boolean {
     return !!Skin.frames[name];
+  }
+
+  /** 战斗图集按 3×2 排列：待机两帧、攻击三帧、受击一帧。 */
+  static battleFrames(beastId: string): SpriteFrame[] | undefined {
+    const sheet = Skin.frames[`battle_${beastId}`];
+    if (!sheet || sheet.rect.width % 3 || sheet.rect.height % 2) return;
+    if (!Skin.battleClips[beastId]) {
+      const w = sheet.rect.width / 3;
+      const h = sheet.rect.height / 2;
+      Skin.battleClips[beastId] = Array.from({ length: 6 }, (_, i) => {
+        const frame = new SpriteFrame();
+        frame.reset({
+          texture: sheet.texture,
+          rect: new Rect((i % 3) * w, Math.floor(i / 3) * h, w, h),
+          originalSize: new Size(w, h),
+        });
+        return frame;
+      });
+    }
+    return Skin.battleClips[beastId];
   }
 }
 

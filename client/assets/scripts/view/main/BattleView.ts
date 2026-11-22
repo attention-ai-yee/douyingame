@@ -1,6 +1,6 @@
-import { _decorator, Component, Graphics, Label, Node, UIOpacity, UITransform } from 'cc';
+import { _decorator, Component, Graphics, Label, Node, Sprite, SpriteFrame, tween, UIOpacity, UITransform, Vec3 } from 'cc';
 import { App } from '../../app/App';
-import { ChallengeResult, formatNumber } from '../../core';
+import { ChallengeResult, Element, formatNumber } from '../../core';
 import { BeastIcon, makeBeastIcon } from '../ui/BeastIcon';
 import { makeSprite, setSprite, Skin } from '../ui/Skin';
 import { hex, makeLabel, setLabel, uiNode } from '../ui/UiKit';
@@ -17,8 +17,10 @@ const ALLY_POS: [number, number][] = [
   [-255, -90],
   [-255, -235],
 ];
-const UNIT = 104;
+const UNIT = 112;
 const HP_W = 100;
+const ATTACK_SECONDS = 0.22;
+const ANTICIPATION_MS = 150;
 
 interface UnitView {
   root: Node;
@@ -27,10 +29,11 @@ interface UnitView {
   baseX: number;
   baseY: number;
   dir: number;
+  element: Element;
+  poses?: SpriteFrame[];
   lunge: number;
   flash: number;
   dead: boolean;
-  scale: number;
 }
 
 export type BattleMode =
@@ -93,6 +96,7 @@ export class BattleView extends Component {
   private cooldown = 0.5;
   private finished = false;
   private wave = 0;
+  private animTime = 0;
   private banner!: Label;
 
   private setup(w: number, h: number, mode: BattleMode, host: BattleHost): void {
@@ -127,6 +131,7 @@ export class BattleView extends Component {
 
   update(dt: number): void {
     if (!App.ready) return;
+    this.animTime += dt;
     this.refreshBackground();
     if (!this.sim) {
       if (this.mode.kind === 'idle') {
@@ -256,10 +261,20 @@ export class BattleView extends Component {
   private makeUnit(beastId: string, x: number, y: number, dir: number, enemy: boolean, scale: number): UnitView {
     const root = uiNode('Unit', this.unitsRoot, x, y);
     root.setScale(scale, scale, 1);
+    const shadow = uiNode('Shadow', root).addComponent(Graphics);
+    shadow.fillColor = hex('#182622', 48);
+    shadow.ellipse(0, -53, 47, 12);
+    shadow.fill();
+    shadow.fillColor = hex('#182622', 40);
+    shadow.ellipse(0, -53, 36, 8);
+    shadow.fill();
     const icon = makeBeastIcon(root, beastId, UNIT * 1.25, 0, 6, { frame: null, enemy });
-    // 我方朝右、敌人朝左；立绘本身朝左的要反过来
-    const artLeft = App.core.idx.beast[beastId].facing === 'left';
-    if (Skin.has(`beast_${beastId}`) && enemy !== artLeft) icon.portrait.setScale(-1, 1, 1);
+    const def = App.core.idx.beast[beastId];
+    const portrait = icon.portrait.getComponent(Sprite);
+    const poses = portrait ? Skin.battleFrames(beastId) : undefined;
+    // 战斗帧统一朝右，未制作图集的异兽沿用立绘朝向。
+    if (portrait && poses) portrait.spriteFrame = poses[0];
+    if (portrait && enemy !== (!poses && def.facing === 'left')) icon.portrait.setScale(-1, 1, 1);
     makeSprite(root, 'hp_bg', HP_W, 20, 0, -UNIT / 2 - 20, { fallback: '#ffffff' });
     const hpFill = makeSprite(root, enemy ? 'hp_red' : 'hp_green', HP_W - 8, 12, -(HP_W - 8) / 2, -UNIT / 2 - 20, { fallback: enemy ? '#ff5a5a' : '#3fcf7f' });
     const ut = hpFill.getComponent(UITransform);
@@ -268,16 +283,17 @@ export class BattleView extends Component {
       const b = App.core.state.beasts[beastId];
       if (b) makeLabel(root, `Lv.${b.level}`, 20, '#ffffff', 0, UNIT / 2 + 14);
     }
-    return { root, icon, hpFill, baseX: x, baseY: y, dir, lunge: 0, flash: 0, dead: false, scale };
+    return { root, icon, hpFill, baseX: x, baseY: y, dir, element: def.element, poses, lunge: 0, flash: 0, dead: false };
   }
 
   private playHit(e: HitEvent): void {
     const from = e.side === 'ally' ? this.allies[e.from] : this.enemies[e.from];
     const to = e.side === 'ally' ? this.enemies[e.to] : this.allies[e.to];
     if (!from || !to) return;
-    from.lunge = 0.18;
+    from.lunge = ATTACK_SECONDS;
     to.flash = 0.15;
     const p = to.root.position;
+    this.playImpact(from.element, p.x, p.y, from.dir, e.crit);
     if (e.side === 'ally') {
       const txt = e.crit ? `暴击 ${formatNumber(e.dmg)}` : formatNumber(e.dmg);
       floatText(this.fxRoot, txt, p.x + (Math.random() * 30 - 15), p.y + 50 * this.layout.scale, e.crit ? 34 : 28, e.crit ? '#ff6d00' : '#fff4d6', 0.7, 55);
@@ -286,6 +302,17 @@ export class BattleView extends Component {
       floatText(this.fxRoot, `-${formatNumber(e.dmg)}`, p.x, p.y + 40, 22, '#e53935', 0.6, 40);
     }
     if (e.killed) to.dead = true;
+  }
+
+  private playImpact(element: Element, x: number, y: number, dir: number, critical: boolean): void {
+    const name = `fx_hit_${element}`;
+    if (!Skin.has(name)) return;
+    const size = critical ? 196 : 150;
+    const impact = makeSprite(this.fxRoot, name, size, size, x, y + 12);
+    const opacity = impact.addComponent(UIOpacity);
+    impact.setScale(dir * 0.6, 0.6, 1);
+    tween(impact).to(0.18, { scale: new Vec3(dir * 1.12, 1.12, 1) }, { easing: 'quadOut' }).start();
+    tween(opacity).delay(0.055).to(0.19, { opacity: 0 }).call(() => impact.destroy()).start();
   }
 
   private syncHp(): void {
@@ -303,16 +330,33 @@ export class BattleView extends Component {
   }
 
   private animateUnits(dt: number): void {
-    for (const u of this.allies.concat(this.enemies)) {
-      u.lunge = Math.max(0, u.lunge - dt);
-      u.flash = Math.max(0, u.flash - dt);
-      const k = u.lunge > 0 ? Math.sin((1 - u.lunge / 0.18) * Math.PI) : 0;
-      u.root.setPosition(u.baseX + u.dir * 30 * k, u.baseY);
-      u.icon.tint(u.flash > 0 ? '#ff8a80' : 'normal');
-      if (u.dead) {
-        const op = u.root.getComponent(UIOpacity) || u.root.addComponent(UIOpacity);
-        op.opacity = Math.max(this.mode.kind === 'idle' ? 0 : 60, op.opacity - Math.round(dt * 600));
-      }
+    this.allies.forEach((u, i) => this.animateUnit(u, dt, this.sim?.allies[i]?.next, i * 0.24));
+    this.enemies.forEach((u, i) => this.animateUnit(u, dt, this.sim?.enemies[i]?.next, i * 0.24 + 0.15));
+  }
+
+  private animateUnit(u: UnitView, dt: number, next: number | undefined, phase: number): void {
+    const hurt = u.flash > 0;
+    const attacking = u.lunge > 0;
+    const untilHit = (next ?? Infinity) - (this.sim?.t ?? 0);
+    const preparing = !u.dead && untilHit > 0 && untilHit <= ANTICIPATION_MS;
+    const recoil = hurt ? 14 * (u.flash / 0.15) : preparing ? 8 * (1 - untilHit / ANTICIPATION_MS) : 0;
+    const strike = attacking ? 34 * (u.lunge / ATTACK_SECONDS) : 0;
+    u.root.setPosition(u.baseX + u.dir * (hurt ? -recoil : strike - recoil), u.baseY);
+    if (u.poses) {
+      const idle = Math.floor((this.animTime + phase) * 2.5) % 2;
+      const index = hurt || u.dead ? 5 : attacking ? (u.lunge > 0.11 ? 3 : 4) : preparing ? 2 : idle;
+      const sprite = u.icon.portrait.getComponent(Sprite);
+      if (sprite && sprite.spriteFrame !== u.poses[index]) sprite.spriteFrame = u.poses[index];
+    } else {
+      const idle = !u.dead && !hurt && !attacking && !preparing ? Math.sin((this.animTime + phase) * 4) * 3 : 0;
+      u.icon.portrait.setPosition(0, 6 + idle);
+    }
+    u.icon.tint(hurt ? '#ffb1a1' : 'normal');
+    u.lunge = Math.max(0, u.lunge - dt);
+    u.flash = Math.max(0, u.flash - dt);
+    if (u.dead) {
+      const op = u.root.getComponent(UIOpacity) || u.root.addComponent(UIOpacity);
+      op.opacity = Math.max(this.mode.kind === 'idle' ? 0 : 60, op.opacity - Math.round(dt * 600));
     }
   }
 

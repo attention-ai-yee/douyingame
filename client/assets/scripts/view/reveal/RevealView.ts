@@ -1,7 +1,7 @@
 import { _decorator, Component, Graphics, Label, Node } from 'cc';
 import { App } from '../../app/App';
 import { BeastDef, RevealSession, Rng, ThrowResult } from '../../core';
-import { setSprite, Skin } from '../ui/Skin';
+import { makeSprite, setSprite, Skin } from '../ui/Skin';
 import { Button, hex, makeButton, makeFullScreen, makeGraphics, makeLabel, setLabel, strokePolyline, uiNode, visibleSize } from '../ui/UiKit';
 import { arcPoints, JUDGE_COLOR, JUDGE_TEXT, polar, sealsText, visualState } from './RevealGeometry';
 
@@ -100,6 +100,7 @@ export class RevealView extends Component {
 
     const blocker = makeFullScreen(this.node, 'Blocker', '#0b0f1a', 242);
     blocker.on(Node.EventType.TOUCH_START, () => this.onTap());
+    makeSprite(blocker, 'bg_reveal', this.W, this.H, 0, 0, { optional: true });
 
     this.root = uiNode('Root', this.node);
     this.beastG = makeGraphics(this.root, 'Beast');
@@ -107,15 +108,18 @@ export class RevealView extends Component {
     this.beastArt = uiNode('Art', this.root);
     this.ringG = makeGraphics(this.root, 'Ring');
     this.marker = uiNode('Marker', this.root);
-    const mg = this.marker.addComponent(Graphics);
-    mg.fillColor = hex('#f6d365');
-    mg.rect(-12, -24, 24, 48);
-    mg.fill();
-    mg.strokeColor = hex('#c0392b');
-    mg.lineWidth = 3;
-    mg.moveTo(0, -16);
-    mg.lineTo(0, 16);
-    mg.stroke();
+    if (Skin.has('icon_ticket')) makeSprite(this.marker, 'icon_ticket', 56, 56);
+    else {
+      const mg = this.marker.addComponent(Graphics);
+      mg.fillColor = hex('#f6d365');
+      mg.rect(-12, -24, 24, 48);
+      mg.fill();
+      mg.strokeColor = hex('#c0392b');
+      mg.lineWidth = 3;
+      mg.moveTo(0, -16);
+      mg.lineTo(0, 16);
+      mg.stroke();
+    }
     this.overlayG = makeGraphics(this.root, 'Overlay');
 
     this.tag = makeLabel(this.root, '', 26, '#9aa3b2', 0, top - 90);

@@ -2,7 +2,7 @@ import { _decorator, Component, Graphics, Label, Node, UIOpacity } from 'cc';
 import { App } from '../../app/App';
 import { PullResult } from '../../core';
 import { makeBeastIcon } from '../ui/BeastIcon';
-import { makeSprite } from '../ui/Skin';
+import { makeSprite, Skin } from '../ui/Skin';
 import { hex, makeFullScreen, makeLabel, setLabel, uiNode, visibleSize } from '../ui/UiKit';
 import { skinButton } from '../ui/Widgets';
 
@@ -68,6 +68,7 @@ export class PullRevealView extends Component {
     this.revealIds = revealIds.slice();
     const vs = visibleSize();
     const mask = makeFullScreen(this.node, 'Mask', '#1d1612', 250);
+    makeSprite(mask, 'bg_reveal', vs.width, vs.height, 0, 0, { optional: true });
     mask.on(Node.EventType.TOUCH_END, () => {
       this.fast = true;
       this.timer = Math.min(this.timer, 0.05);
@@ -97,14 +98,18 @@ export class PullRevealView extends Component {
     g.fillColor = hex(fog, 255);
     g.roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 16);
     g.fill();
-    g.fillColor = hex('#ffffff', 120);
-    g.circle(0, 6, 36);
-    g.fill();
+    const painted = Skin.has('pull_card_back');
+    if (!painted) {
+      g.fillColor = hex('#ffffff', 120);
+      g.circle(0, 6, 36);
+      g.fill();
+    }
     g.lineWidth = 5;
     g.strokeColor = hex(OL);
     g.roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 16);
     g.stroke();
-    makeLabel(back, '？', 48, OL, 0, 4);
+    if (painted) makeSprite(back, 'pull_card_back', CARD_W - 10, CARD_H - 10);
+    else makeLabel(back, '？', 48, OL, 0, 4);
     if (r.shiny) makeLabel(back, '✦  ✦', 26, '#ffffff', 0, CARD_H / 2 - 24);
     // 正面：立绘 + 名字 + 品质色边
     const front = uiNode('Front', node);

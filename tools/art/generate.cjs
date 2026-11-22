@@ -33,19 +33,23 @@ const ROUND = "'ZCOOL KuaiLe','Noto Serif SC',sans-serif";
 
 function button(top, bot, dark) {
   return svg(240, 104, `
-    <rect x="6" y="16" width="228" height="82" rx="36" fill="${dark}" stroke="${OL}" stroke-width="${SW}"/>
-    <rect x="6" y="6" width="228" height="82" rx="36" fill="url(#g)" stroke="${OL}" stroke-width="${SW}"/>
-    <rect x="26" y="15" width="150" height="20" rx="10" fill="#fff" opacity="0.45"/>
-    <circle cx="200" cy="25" r="6" fill="#fff" opacity="0.6"/>`,
+    <rect x="7" y="13" width="226" height="85" rx="30" fill="${dark}"/>
+    <rect x="7" y="6" width="226" height="84" rx="30" fill="url(#g)" stroke="${dark}" stroke-width="3"/>
+    <rect x="13" y="12" width="214" height="72" rx="24" fill="none" stroke="#f9dfac" stroke-opacity="0.54" stroke-width="2"/>
+    <path d="M19 48l5-5 5 5-5 5zm192 0 5-5 5 5-5 5z" fill="#fae5b8" opacity="0.68"/>`,
     `<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bot}"/></linearGradient>`);
 }
-const panelCream = () => svg(200, 200, `<rect x="5" y="5" width="190" height="190" rx="36" fill="#fff8ea" stroke="${OL}" stroke-width="${SW}"/>
-  <rect x="18" y="18" width="164" height="164" rx="26" fill="none" stroke="#f0c98f" stroke-width="3" stroke-dasharray="10 8"/>`);
-const panelDark = () => svg(200, 200, `<rect x="5" y="5" width="190" height="190" rx="36" fill="#3d2a24" fill-opacity="0.92" stroke="${OL}" stroke-width="${SW}"/>
-  <rect x="16" y="16" width="168" height="168" rx="26" fill="none" stroke="#ffd27a" stroke-width="2.5" opacity="0.6"/>`);
-const pill = () => svg(220, 64, `<rect x="3" y="3" width="214" height="58" rx="29" fill="#fffaf0" stroke="${OL}" stroke-width="4"/>`);
-const tabBar = () => svg(300, 170, `<rect x="0" y="6" width="300" height="164" fill="#fffaf0"/><rect x="0" y="0" width="300" height="8" fill="${OL}"/>
-  <rect x="0" y="12" width="300" height="4" fill="#f0c98f" opacity="0.8"/>`);
+const panelCream = () => svg(200, 200, `<rect x="5" y="8" width="190" height="188" rx="25" fill="#503e2c" opacity="0.22"/>
+  <rect x="5" y="4" width="190" height="188" rx="25" fill="#fff8e8" stroke="#9e815b" stroke-width="3"/>
+  <rect x="13" y="12" width="174" height="172" rx="19" fill="none" stroke="#d3b989" stroke-width="2"/>
+  <path d="M24 27l5-5 5 5-5 5zm142 0 5-5 5 5-5 5zM24 169l5-5 5 5-5 5zm142 0 5-5 5 5-5 5z" fill="#c1a171" opacity="0.75"/>`);
+const panelDark = () => svg(200, 200, `<rect x="5" y="5" width="190" height="190" rx="26" fill="#253e3b" stroke="#1b2b29" stroke-width="3"/>
+  <rect x="13" y="13" width="174" height="174" rx="19" fill="none" stroke="#d6af75" stroke-width="2" opacity="0.7"/>`);
+const pill = () => svg(220, 64, `<rect x="3" y="4" width="214" height="56" rx="22" fill="#fff8e7" stroke="#ad9670" stroke-width="2"/>
+  <rect x="7" y="8" width="206" height="48" rx="18" fill="none" stroke="#e1c99d" stroke-width="1"/>`);
+const tabBar = () => svg(300, 170, `<rect width="300" height="170" fill="url(#paper)"/>
+  <rect width="300" height="3" fill="#63786a"/><rect y="6" width="300" height="1" fill="#bba374"/>`,
+  '<linearGradient id="paper" x2="0" y2="1"><stop offset="0" stop-color="#fff9e9"/><stop offset="1" stop-color="#eae6d4"/></linearGradient>');
 const hpBar = (kind) => {
   if (kind === 'bg') return svg(120, 24, `<rect x="2" y="2" width="116" height="20" rx="10" fill="#fff" stroke="${OL}" stroke-width="4"/>`);
   const [a, b] = kind === 'green' ? ['#8ef0b0', '#3fcf7f'] : ['#ff9a8a', '#ff5a5a'];
@@ -137,10 +141,10 @@ const ASSETS = [];
 const add = (name, svgText, opts = {}) => ASSETS.push({ name, svg: svgText, ...opts });
 add('panel_paper', panelCream(), { inset: [56, 56, 56, 56] });
 add('panel_ink', panelDark(), { inset: [56, 56, 56, 56] });
-add('btn_red', button('#ff8a7a', '#ff5a5a', '#d93f3f'), { inset: [48, 40, 48, 44] });
-add('btn_gold', button('#ffe27a', '#ffc43d', '#e8a317'), { inset: [48, 40, 48, 44] });
-add('btn_ink', button('#9ad8ff', '#4fb2ff', '#2f8ee0'), { inset: [48, 40, 48, 44] });
-add('btn_jade', button('#8ef0b0', '#3fcf7f', '#2aa864'), { inset: [48, 40, 48, 44] });
+add('btn_red', button('#bf6450', '#994033', '#763329'), { inset: [48, 40, 48, 44] });
+add('btn_gold', button('#f3d38b', '#cb9b59', '#a67b43'), { inset: [48, 40, 48, 44] });
+add('btn_ink', button('#536e70', '#344c52', '#23343a'), { inset: [48, 40, 48, 44] });
+add('btn_jade', button('#68967d', '#41725b', '#315643'), { inset: [48, 40, 48, 44] });
 add('pill', pill(), { inset: [32, 24, 32, 24] });
 add('tab_bar', tabBar(), { inset: [10, 30, 10, 30] });
 add('hp_bg', hpBar('bg'), { inset: [12, 10, 12, 10] });
@@ -179,7 +183,7 @@ for (const k of Object.keys(TABS)) {
 
 // ---------------------------------------------------------------- 渲染
 (async () => {
-  const filter = process.argv[2] || '';
+  const filters = process.argv.slice(2);
   fs.mkdirSync(OUT, { recursive: true });
   const TMP_HTML = path.join(require('os').tmpdir(), 'yushou-art-render.html');
   const browser = await chromium.launch();
@@ -187,7 +191,7 @@ for (const k of Object.keys(TABS)) {
   const head = FONT_CSS.map((h) => `<link rel="stylesheet" href="${h}">`).join('');
   let n = 0;
   for (const a of ASSETS) {
-    if (filter && a.name.indexOf(filter) < 0) continue;
+    if (filters.length && !filters.some((filter) => a.name.includes(filter))) continue;
     const m = /width="(\d+)" height="(\d+)"/.exec(a.svg);
     const w = +m[1];
     const h = +m[2];

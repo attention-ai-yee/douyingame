@@ -2,7 +2,7 @@ import { EventTouch, Graphics, Label, Node, UITransform } from 'cc';
 import { App } from '../../app/App';
 import { formatNumber } from '../../core';
 import { makeBeastIcon } from '../ui/BeastIcon';
-import { makeSprite, setSprite } from '../ui/Skin';
+import { makeSprite, setSprite, Skin } from '../ui/Skin';
 import { hex, makeLabel, setLabel, uiNode } from '../ui/UiKit';
 import { alignedLabel, redDot, skinButton, SkinButton } from '../ui/Widgets';
 import { registerGuideTarget } from './GuideView';
@@ -39,6 +39,7 @@ export class MapPage implements Page {
   private chapter = 1;
   private tower = false;
   private header: Node;
+  private vista: Node;
   private tabs: Node[] = [];
   private progressBar: Graphics;
   private progressL: Label;
@@ -74,6 +75,7 @@ export class MapPage implements Page {
     hb.fillColor = hex('#e3c999');
     hb.rect(-w / 2, -84, w, 4);
     hb.fill();
+    this.vista = uiNode('Vista', this.header);
     const names = App.cfg.stages.chapters.map((c) => c.name.split('·')[0]).concat(['镇妖塔']);
     const tw = (w - 40) / names.length;
     names.forEach((name, i) => {
@@ -136,6 +138,9 @@ export class MapPage implements Page {
   private refreshHeader(): void {
     const core = App.core;
     const chs = App.cfg.stages.chapters;
+    const vista = `bg_mountain_${chs[this.chapter - 1].mountain}`;
+    this.vista.active = !this.tower && Skin.has(vista);
+    if (this.vista.active) setSprite(this.vista, vista, this.w, 160, { optional: true, alpha: 105 });
     this.tabs.forEach((n, i) => {
       const on = this.tower ? i === chs.length : i === this.chapter - 1;
       const open = i === chs.length ? core.towerUnlocked() : this.unlocked(i + 1);
@@ -318,7 +323,20 @@ export class MapPage implements Page {
     g.fillColor = hex('#eef2f4');
     g.rect(-this.w / 2, -this.h / 2, this.w, this.h);
     g.fill();
-    // 一座七层小塔
+    // 暂无塔立绘时保留旧的七层塔绘制。
+    if (Skin.has('icon_tower')) {
+      makeSprite(content, 'icon_tower', 420, 420, 0, 70);
+      const plaque = makeSprite(content, 'btn_ink', 225, 64, 0, -190);
+      makeLabel(plaque, `第 ${core.state.floor + 1} 层`, 32, '#fff4d6');
+    } else {
+      this.drawTower(g);
+      makeLabel(g.node, `第 ${core.state.floor + 1} 层`, 34, '#ffffff', 0, -230);
+    }
+    makeSprite(content, 'map_cloud', 200, 100, -220, 300, { optional: true });
+    makeSprite(content, 'map_cloud', 170, 85, 230, 120, { optional: true });
+  }
+
+  private drawTower(g: Graphics): void {
     for (let i = 0; i < 7; i++) {
       const y = -260 + i * 78;
       const half = 150 - i * 14;
@@ -338,9 +356,6 @@ export class MapPage implements Page {
       g.fill();
       g.stroke();
     }
-    makeLabel(g.node, `第 ${core.state.floor + 1} 层`, 34, '#ffffff', 0, -230);
-    makeSprite(content, 'map_cloud', 200, 100, -220, 300, { optional: true });
-    makeSprite(content, 'map_cloud', 170, 85, 230, 120, { optional: true });
   }
 
   private clamp(v: number): number {
