@@ -139,7 +139,7 @@ export class Boot extends Component {
         this.autoTimer = 0;
         this.autoStep();
       }
-    } else if (!this.reveal && App.core.revealQueue.length) {
+    } else if (!this.reveal && App.core.revealQueue.length && !(this.main && this.main.holdReveals())) {
       this.openQueuedReveal(App.core.revealQueue[0]);
     }
   }

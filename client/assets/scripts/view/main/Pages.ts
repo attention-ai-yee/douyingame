@@ -1,6 +1,6 @@
 import { Graphics, Label, Node, UITransform } from 'cc';
 import { App, RELEASE } from '../../app/App';
-import { formatNumber, PullResult, RARITIES } from '../../core';
+import { formatNumber, RARITIES } from '../../core';
 import { makeBeastIcon, starText } from '../ui/BeastIcon';
 import { makeSprite, setSprite, Skin } from '../ui/Skin';
 import { hex, makeLabel, setLabel, uiNode } from '../ui/UiKit';
@@ -454,12 +454,4 @@ export class MorePage implements Page {
     }
     this.host.resetSave();
   }
-}
-
-export function describePull(results: PullResult[]): string {
-  const counts: Record<string, number> = {};
-  for (const r of results) counts[r.beastId] = (counts[r.beastId] || 0) + 1;
-  return Object.keys(counts)
-    .map((id) => `${App.core.idx.beast[id].name}${counts[id] > 1 ? '×' + counts[id] : ''}`)
-    .join('、');
 }

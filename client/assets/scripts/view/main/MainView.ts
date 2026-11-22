@@ -1,6 +1,6 @@
 import { _decorator, Component, game, Graphics, Label, Node, UITransform } from 'cc';
 import { App } from '../../app/App';
-import { ChestClaim, formatDuration, formatNumber, PullResult, SigninReward } from '../../core';
+import { ChestClaim, formatDuration, formatNumber, SigninReward } from '../../core';
 import { makeBeastIcon } from '../ui/BeastIcon';
 import { makeSprite, setSprite, Skin } from '../ui/Skin';
 import { hex, makeLabel, setLabel, uiNode, visibleSize } from '../ui/UiKit';
@@ -11,7 +11,8 @@ import { BeastDetail } from './BeastDetail';
 import { itemName, makeItemIcon } from './ItemIcon';
 import { GuideView, registerGuideTarget } from './GuideView';
 import { LootFly } from './LootFly';
-import { BeastsPage, BookPage, describePull, MainHooks, MorePage, MountainPage, Page, PageHost } from './Pages';
+import { BeastsPage, BookPage, MainHooks, MorePage, MountainPage, Page, PageHost } from './Pages';
+import { PullRevealView } from './PullRevealView';
 import { StageView } from './StageView';
 import { TasksPopup } from './TasksPopup';
 
@@ -73,6 +74,7 @@ export class MainView extends Component implements PageHost {
   private tabDots: Partial<Record<TabKey, Node>> = {};
   private current: TabKey = 'battle';
   private popupOpen = false;
+  private pullView: PullRevealView | null = null;
   private signinAutoShown = false;
   private refreshT = 1;
 
@@ -485,14 +487,32 @@ export class MainView extends Component implements PageHost {
   }
 
   doPull(mountainId: string, count: number): void {
+    if (this.popupOpen) return;
+    const before: Record<number, boolean> = {};
+    for (const p of App.core.revealQueue) before[p.id] = true;
+    const free = count === 10 && App.core.canFreeTenPull();
     const res = App.core.pull(mountainId, count);
     if (!res.ok) {
       this.toast(res.reason === 'tickets' ? '寻兽符不够了，看视频可以领' : '这座山还没开放');
       return;
     }
-    App.analytics.track('pull', { mountain: mountainId, count, free: count === 10 && res.results.length === 10 });
+    App.analytics.track('pull', { mountain: mountainId, count, free });
     App.save();
-    this.showPullResults(res.results);
+    // 这次新进入拍符队列的（按顺序对应翻到的稀有卡）
+    const revealIds = App.core.revealQueue.filter((p) => !before[p.id]).map((p) => p.id);
+    this.popupOpen = true;
+    this.pullView = PullRevealView.open(this.overlay, mountainId, res.results, revealIds, {
+      onClose: (again) => {
+        this.pullView = null;
+        this.popupOpen = false;
+        if (again) this.doPull(mountainId, 10);
+      },
+    });
+  }
+
+  /** 十连揭晓还没翻到稀有卡时，Boot 先不要弹现身拍符。 */
+  holdReveals(): boolean {
+    return !!this.pullView && this.pullView.holding;
   }
 
   showRates(): void {
@@ -529,24 +549,6 @@ export class MainView extends Component implements PageHost {
   }
 
   // ------------------------------------------------------------ 弹窗
-
-  private showPullResults(results: PullResult[]): void {
-    const pop = popup(this.overlay, results.length >= 10 ? '寻兽十连' : '寻兽收获', 680, results.length >= 10 ? 640 : 460);
-    const cols = 5;
-    results.forEach((r, i) => {
-      const x = (i % cols - (Math.min(cols, results.length) - 1) / 2) * 124;
-      const y = results.length > 5 ? 120 - Math.floor(i / cols) * 200 : 40;
-      makeBeastIcon(pop.body, r.beastId, 96, x, y, {});
-      makeLabel(pop.body, App.core.idx.beast[r.beastId].name, 22, OL, x, y - 66);
-      if (r.isNew) {
-        const t = makeSprite(pop.body, 'btn_red', 56, 30, x + 34, y + 44, { fallback: '#ff5a5a' });
-        makeLabel(t, '新', 18, '#ffffff', 0, 2);
-      }
-      if (r.shiny) makeLabel(pop.body, '✦闪光', 18, '#e8a317', x - 30, y + 46);
-    });
-    const rare = results.filter((r) => r.needsReveal).length;
-    makeLabel(pop.body, rare ? `有 ${rare} 只稀有异兽现身，快去拍符！` : describePull(results), 24, '#8a6d55', 0, results.length > 5 ? -190 : -70);
-  }
 
   private showSignin(): void {
     if (this.popupOpen) return;
